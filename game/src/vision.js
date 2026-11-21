@@ -21,23 +21,23 @@ export function makeGrid(rows) {
     rows,
     width: rows[0].length,
     height: rows.length,
-  };
-  grid.tileAt = function (tx, ty) {
-    const outside = tx < 0 || ty < 0 || tx >= this.width || ty >= this.height;
-    return outside ? '#' : this.rows[ty][tx];
-  };
-  grid.blocksSight = function (tx, ty) {
-    return BLOCKS_VIEW.has(this.tileAt(tx, ty));
-  };
-  grid.blocksMove = function (tx, ty) {
-    return BLOCKS_STEP.has(this.tileAt(tx, ty));
-  };
-  // Is this pixel inside a tile feet cannot enter?
-  grid.pointBlocked = function (px, py) {
-    return this.blocksMove(Math.floor(px / TILE), Math.floor(py / TILE));
-  };
-  grid.tileCenter = function (tx, ty) {
-    return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
+    tileAt(tx, ty) {
+      const outside = tx < 0 || ty < 0 || tx >= this.width || ty >= this.height;
+      return outside ? '#' : this.rows[ty][tx];
+    },
+    blocksSight(tx, ty) {
+      return BLOCKS_VIEW.has(this.tileAt(tx, ty));
+    },
+    blocksMove(tx, ty) {
+      return BLOCKS_STEP.has(this.tileAt(tx, ty));
+    },
+    // Is this pixel inside a tile feet cannot enter?
+    pointBlocked(px, py) {
+      return this.blocksMove(Math.floor(px / TILE), Math.floor(py / TILE));
+    },
+    tileCenter(tx, ty) {
+      return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
+    },
   };
   return grid;
 }
@@ -97,7 +97,8 @@ export function conePolygon(grid, eyeX, eyeY, facing, halfFov, range) {
   const outline = [{ x: eyeX, y: eyeY }];
   const rayCount = 30;
   for (let ray = 0; ray <= rayCount; ray++) {
-    const heading = facing - halfFov + (2 * halfFov * ray) / rayCount;
+    const fraction = ray / rayCount;
+    const heading = facing + (2 * fraction - 1) * halfFov;
     const stepX = Math.cos(heading);
     const stepY = Math.sin(heading);
     let px = eyeX;
@@ -121,17 +122,20 @@ export function conePolygon(grid, eyeX, eyeY, facing, halfFov, range) {
 export function slideMove(grid, x, y, radius, dx, dy) {
   const free = (px, py) => !grid.pointBlocked(px, py);
   const probe = radius * 0.7;
+  // Each axis is tried on its own: the leading edge is probed at three
+  // heights, and an axis whose edge would enter a blocking tile is
+  // dropped, so bodies slide along walls instead of jamming.
+  const axisClear = (px, py, horizontal) => {
+    if (horizontal) return free(px, py - probe) && free(px, py) && free(px, py + probe);
+    return free(px - probe, py) && free(px, py) && free(px + probe, py);
+  };
   if (dx !== 0) {
     const ahead = x + dx + Math.sign(dx) * radius;
-    if (free(ahead, y - probe) && free(ahead, y) && free(ahead, y + probe)) {
-      x += dx;
-    }
+    if (axisClear(ahead, y, true)) x += dx;
   }
   if (dy !== 0) {
     const ahead = y + dy + Math.sign(dy) * radius;
-    if (free(x - probe, ahead) && free(x, ahead) && free(x + probe, ahead)) {
-      y += dy;
-    }
+    if (axisClear(x, ahead, false)) y += dy;
   }
   return { x, y };
 }

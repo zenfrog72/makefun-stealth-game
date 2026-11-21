@@ -28,10 +28,15 @@ const SHOT_SHORT_SIDE_MIN = 480;
 function pngSize(path: string): { width: number; height: number } {
   const head = readFileSync(path).subarray(0, 24);
   const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  const isPng = signature.every((byte, i) => head[i] === byte);
-  if (!isPng) throw new Error(`${path}: not a PNG (this entry ships PNG screenshots)`);
+  for (let i = 0; i < signature.length; i++) {
+    if (head[i] !== signature[i]) {
+      throw new Error(`${path}: not a PNG (this entry ships PNG screenshots)`);
+    }
+  }
   const view = new DataView(head.buffer, head.byteOffset, head.byteLength);
-  return { width: view.getUint32(16), height: view.getUint32(20) };
+  const width = view.getUint32(16);
+  const height = view.getUint32(20);
+  return { width, height };
 }
 
 // Check the screenshots directory against the gate's rules and return
@@ -40,34 +45,40 @@ function checkScreenshots(dir: string): string[] {
   const names = readdirSync(dir)
     .filter((n) => /\.(png|jpe?g)$/i.test(n) && !n.startsWith('.'))
     .sort();
-  if (names.length < 3 || names.length > 4) {
-    throw new Error(`screenshots/: expected 3 or 4 images, found ${names.length}`);
+  const count = names.length;
+  if (count < 3 || count > 4) {
+    throw new Error(`screenshots/: expected 3 or 4 images, found ${count}`);
   }
   for (const name of names) {
-    const path = join(dir, name);
-    const bytes = statSync(path).size;
-    if (bytes > SHOT_MAX_BYTES) {
-      throw new Error(`screenshots/${name}: ${bytes} bytes exceeds the 256 KiB cap`);
-    }
-    if (/\.png$/i.test(name)) {
-      const { width, height } = pngSize(path);
-      const long = Math.max(width, height);
-      const short = Math.min(width, height);
-      if (long > SHOT_LONG_SIDE_MAX || short < SHOT_SHORT_SIDE_MIN) {
-        throw new Error(`screenshots/${name}: ${width}x${height} breaks the screenshot size rule`);
-      }
-    }
+    checkShotSize(join(dir, name));
   }
   return names;
+}
+
+// One file against the size and dimension caps.
+function checkShotSize(path: string): void {
+  const name = path.split('/').pop() ?? path;
+  const bytes = statSync(path).size;
+  if (bytes > SHOT_MAX_BYTES) {
+    throw new Error(`screenshots/${name}: ${bytes} bytes exceeds the 256 KiB cap`);
+  }
+  if (!/\.png$/i.test(name)) return;
+  const { width, height } = pngSize(path);
+  const long = Math.max(width, height);
+  const short = Math.min(width, height);
+  if (long > SHOT_LONG_SIDE_MAX || short < SHOT_SHORT_SIDE_MIN) {
+    throw new Error(`screenshots/${name}: ${width}x${height} breaks the screenshot size rule`);
+  }
 }
 
 const shots = checkScreenshots(join(here, 'screenshots'));
 
 mkdirSync(out, { recursive: true });
 cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
-mkdirSync(join(out, 'screenshots'), { recursive: true });
+const shotsOut = join(out, 'screenshots');
+mkdirSync(shotsOut, { recursive: true });
 if (existsSync(join(here, 'screenshots'))) {
-  cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
+  cpSync(join(here, 'screenshots'), shotsOut, { recursive: true });
 }
 
 // The caps below are the scorer's own (see the kit's RULES.txt, The
@@ -84,4 +95,4 @@ writeFileSync(
   }),
 );
 
-console.log(`Velvet Hour handed in: game/ + ${shots.length} screenshots (${shots.join(', ')}) -> ${out}`);
+console.log(`Velvet Hour handed in: game/ + ${shots.length} screenshots -> ${out} (${shots.join(', ')})`);

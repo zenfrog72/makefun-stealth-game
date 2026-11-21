@@ -18,25 +18,27 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const sound = new SoundEngine();
 
+// el is a shortcut for the one lookup this file does everywhere.
+function el(id) {
+  return document.getElementById(id);
+}
+
 // The HUD's live elements, gathered once.
 const hud = {
-  level: document.getElementById('hud-level'),
-  target: document.getElementById('hud-target'),
-  gems: document.getElementById('hud-gems'),
-  score: document.getElementById('hud-score'),
-  time: document.getElementById('hud-time'),
-  eyeFill: document.getElementById('eye-fill'),
-  eye: document.getElementById('hud-eye'),
-  hint: document.getElementById('hint'),
+  level: el('hud-level'),
+  target: el('hud-target'),
+  gems: el('hud-gems'),
+  score: el('hud-score'),
+  time: el('hud-time'),
+  eyeFill: el('eye-fill'),
+  eye: el('hud-eye'),
+  hint: el('hint'),
 };
-const overlay = document.getElementById('overlay');
-const panels = {
-  title: document.getElementById('panel-title'),
-  caught: document.getElementById('panel-caught'),
-  clear: document.getElementById('panel-clear'),
-  complete: document.getElementById('panel-complete'),
-  pause: document.getElementById('panel-pause'),
-};
+const overlay = el('overlay');
+const panels = {};
+for (const name of ['title', 'caught', 'clear', 'complete', 'pause']) {
+  panels[name] = el('panel-' + name);
+}
 
 let state = 'title';
 let world = null;
@@ -149,12 +151,19 @@ const thiefSound = {
 };
 
 // pollKeys turns the held keys into one frame of travel input.
+const MOVE_KEYS = {
+  arrowleft: [-1, 0], a: [-1, 0],
+  arrowright: [1, 0], d: [1, 0],
+  arrowup: [0, -1], w: [0, -1],
+  arrowdown: [0, 1], s: [0, 1],
+};
 function pollKeys() {
   const input = { x: 0, y: 0, sneak: keys.has('shift') };
-  if (keys.has('arrowleft') || keys.has('a')) input.x -= 1;
-  if (keys.has('arrowright') || keys.has('d')) input.x += 1;
-  if (keys.has('arrowup') || keys.has('w')) input.y -= 1;
-  if (keys.has('arrowdown') || keys.has('s')) input.y += 1;
+  for (const [key, step] of Object.entries(MOVE_KEYS)) {
+    if (!keys.has(key)) continue;
+    input.x += step[0];
+    input.y += step[1];
+  }
   return input;
 }
 
@@ -164,7 +173,7 @@ function spawnFloater(x, y, text) {
 
 function takeGem(gem) {
   gem.taken = true;
-  world.gemsTaken++;
+  world.gemsTaken += 1;
   world.score += 100;
   world.staticDirty = true;
   const middle = world.grid.tileCenter(gem.tx, gem.ty);
@@ -177,7 +186,8 @@ function takeTarget(tx, ty) {
   world.score += 500;
   world.staticDirty = true;
   const middle = world.grid.tileCenter(tx, ty);
-  spawnFloater(middle.x, middle.y - 16, '+500 ' + world.targetName.toUpperCase());
+  const label = '+500 ' + world.targetName.toUpperCase();
+  spawnFloater(middle.x, middle.y - 16, label);
   sound.targetPickup();
   flashHint(`The ${world.targetName} is yours — reach the EXIT doors.`, 5);
 }
@@ -187,13 +197,15 @@ function triggerAlarm() {
   world.alarmTimer = 5;
   world.alarmBeepTimer = 0;
   world.ghost = false;
+  // Every guard who is not already hunting turns toward where the
+  // thief was last seen and starts searching there.
   for (const guard of world.guards) {
     guard.lastSeen = { x: world.player.x, y: world.player.y };
-    if (guard.mode === 'patrol' || guard.mode === 'wait' || guard.mode === 'curious') {
-      guard.mode = 'search';
-      guard.searchTimer = 3.2;
-      guard.suspicion = Math.max(guard.suspicion, 0.6);
-    }
+    const idle = guard.mode === 'patrol' || guard.mode === 'wait' || guard.mode === 'curious';
+    if (!idle) continue;
+    guard.mode = 'search';
+    guard.searchTimer = 3.2;
+    if (guard.suspicion < 0.6) guard.suspicion = 0.6;
   }
   flashHint('The camera raised the alarm — stay unseen until it fades.', 5);
 }
@@ -203,7 +215,7 @@ function updateCameras(dt) {
   for (const camera of world.cameras) {
     camera.update(dt, world.elapsed);
     const rate = camera.detection(world.grid, world.player);
-    if (rate > worst) worst = rate;
+    worst = Math.max(worst, rate);
   }
   if (world.alarmActive) {
     world.alarmTimer -= dt;
@@ -216,10 +228,12 @@ function updateCameras(dt) {
       world.alarmActive = false;
       world.cameraMeter = 0.3;
     }
-  } else if (worst > 0) {
+    return worst;
+  }
+  if (worst > 0) {
     world.cameraMeter = Math.min(1, world.cameraMeter + worst * 0.55 * dt);
     if (world.cameraMeter >= 1) triggerAlarm();
-  } else {
+  } else if (world.cameraMeter > 0) {
     world.cameraMeter = Math.max(0, world.cameraMeter - 0.35 * dt);
   }
   return worst;
@@ -280,9 +294,10 @@ function updatePlay(dt) {
 function onCaught() {
   state = 'caught';
   sound.caught();
-  document.getElementById('caught-text').textContent =
+  const caughtLine =
     `Spotted in ${world.level.name}. The ${world.targetName} stays in its case tonight — ` +
     'watch the patrols, keep to the rugs, and try again.';
+  el('caught-text').textContent = caughtLine;
   setPanel('caught');
 }
 
@@ -316,9 +331,10 @@ function onCleared() {
 
 function onComplete() {
   state = 'complete';
-  document.getElementById('complete-text').textContent =
+  const doneLine =
     `Every gallery emptied, every guard none the wiser. Final score: ${world.score}. ` +
     'The Velvet Hour strikes again next weekend.';
+  el('complete-text').textContent = doneLine;
   setPanel('complete');
 }
 
@@ -346,7 +362,8 @@ function paintHud(force) {
   hud.time.textContent = clockText(world.elapsed);
   const heat = Math.max(world.maxSuspicion ?? 0, world.cameras.length ? world.cameraMeter : 0);
   hud.eyeFill.style.width = Math.round(heat * 100) + '%';
-  hud.eyeFill.style.background = heat >= 0.75 ? '#ff4a30' : heat >= 0.4 ? '#ff9a3c' : '#ffd94d';
+  const eyeColour = heat >= 0.75 ? '#ff4a30' : heat >= 0.4 ? '#ff9a3c' : '#ffd94d';
+  hud.eyeFill.style.background = eyeColour;
   hud.eye.classList.toggle('alarm', world.alarmActive);
   if (world.hintTimer > 0) {
     hud.hint.textContent = world.hintOverride;
@@ -369,33 +386,36 @@ function paintHud(force) {
 
 // ----------------------------------------------------------------- input
 
-window.addEventListener('keydown', (event) => {
-  const key = event.key.toLowerCase();
-  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) event.preventDefault();
-  sound.ensure();
-  if (key === 'shift') keys.add('shift');
-  else keys.add(key);
-  if ((key === 'p' || key === 'escape') && state === 'play') {
+// togglePause flips between play and paused, from key or button.
+function togglePause() {
+  if (state === 'play') {
     state = 'paused';
     setPanel('pause');
-  } else if ((key === 'p' || key === 'escape') && state === 'paused') {
+  } else if (state === 'paused') {
     state = 'play';
     setPanel(null);
   }
+}
+
+window.addEventListener('keydown', (event) => {
+  const key = event.key.toLowerCase();
+  const isArrow = key.startsWith('arrow');
+  if (isArrow || key === ' ') event.preventDefault();
+  sound.ensure();
+  keys.add(key);
+  if (key === 'p' || key === 'escape') togglePause();
   if (key === 'm') flipMute();
   if (key === 'r' && state === 'caught') restartLevel();
   if (key === 'enter' && state === 'clear') advanceFromClear();
 });
 
 window.addEventListener('keyup', (event) => {
-  const key = event.key.toLowerCase();
-  if (key === 'shift') keys.delete('shift');
-  else keys.delete(key);
+  keys.delete(event.key.toLowerCase());
 });
 
 function flipMute() {
   sound.setMuted(!sound.muted);
-  document.getElementById('btn-mute').textContent = sound.muted ? 'SOUND OFF' : 'SOUND ON';
+  el('btn-mute').textContent = sound.muted ? 'SOUND OFF' : 'SOUND ON';
 }
 
 function advanceFromClear() {
@@ -406,26 +426,27 @@ function advanceFromClear() {
   }
 }
 
-// Buttons.
-document.getElementById('btn-pause').addEventListener('click', () => {
-  sound.ensure();
-  if (state === 'play') { state = 'paused'; setPanel('pause'); }
-  else if (state === 'paused') { state = 'play'; setPanel(null); }
-});
-document.getElementById('btn-restart').addEventListener('click', () => { sound.ensure(); if (world) restartLevel(); });
-document.getElementById('btn-mute').addEventListener('click', () => { sound.ensure(); flipMute(); });
-document.getElementById('btn-retry-caught').addEventListener('click', restartLevel);
-document.getElementById('btn-menu-caught').addEventListener('click', backToTitle);
-document.getElementById('btn-next').addEventListener('click', advanceFromClear);
-document.getElementById('btn-retry-clear').addEventListener('click', restartLevel);
-document.getElementById('btn-menu-clear').addEventListener('click', backToTitle);
-document.getElementById('btn-resume').addEventListener('click', () => { state = 'play'; setPanel(null); });
-document.getElementById('btn-restart-pause').addEventListener('click', restartLevel);
-document.getElementById('btn-menu-pause').addEventListener('click', backToTitle);
-document.getElementById('btn-again').addEventListener('click', () => startLevel(0, 0));
-document.getElementById('btn-menu-complete').addEventListener('click', backToTitle);
+// Buttons: one row per button, its handler beside it.
+const BUTTON_ACTIONS = [
+  ['btn-pause', () => { sound.ensure(); togglePause(); }],
+  ['btn-restart', () => { sound.ensure(); if (world) restartLevel(); }],
+  ['btn-mute', () => { sound.ensure(); flipMute(); }],
+  ['btn-retry-caught', restartLevel],
+  ['btn-menu-caught', backToTitle],
+  ['btn-next', advanceFromClear],
+  ['btn-retry-clear', restartLevel],
+  ['btn-menu-clear', backToTitle],
+  ['btn-resume', () => { state = 'play'; setPanel(null); }],
+  ['btn-restart-pause', restartLevel],
+  ['btn-menu-pause', backToTitle],
+  ['btn-again', () => startLevel(0, 0)],
+  ['btn-menu-complete', backToTitle],
+];
+for (const [id, handler] of BUTTON_ACTIONS) {
+  el(id).addEventListener('click', handler);
+}
 
-const levelButtons = document.getElementById('level-buttons');
+const levelButtons = el('level-buttons');
 LEVELS.forEach((level, i) => {
   const button = document.createElement('button');
   button.className = 'level-btn';
@@ -445,11 +466,13 @@ function backToTitle() {
 }
 
 function refreshLevelButtons() {
-  levelButtons.querySelectorAll('.level-btn').forEach((button) => {
+  const buttons = levelButtons.querySelectorAll('.level-btn');
+  for (const button of buttons) {
     const i = Number(button.dataset.index);
-    button.disabled = i > unlocked;
-    button.classList.toggle('locked', i > unlocked);
-  });
+    const locked = i > unlocked;
+    button.disabled = locked;
+    button.classList.toggle('locked', locked);
+  }
 }
 
 // ------------------------------------------------------- staged captures
@@ -569,19 +592,23 @@ function takeGemSilent(tx, ty) {
 
 // ------------------------------------------------------------------ loop
 
+// idleTitle runs the museum behind the menu: guards patrol, cameras
+// sweep, and nobody is there to catch — a dummy thief far off-map.
+function idleTitle(dt) {
+  const dummy = { x: -9999, y: -9999, moving: false, sneaking: true, inShadow: () => true };
+  world.elapsed += dt;
+  const quiet = { onStep() {}, onShout() {} };
+  for (const guard of world.guards) guard.update(dt, dummy, quiet);
+  for (const camera of world.cameras) camera.update(dt, world.elapsed);
+}
+
 function frame(timestamp) {
   const dt = Math.min(0.033, (timestamp - lastTimestamp) / 1000 || 0);
   lastTimestamp = timestamp;
   if (world) {
     world.state = state;
     if (state === 'play') updatePlay(dt);
-    else if (state === 'title') {
-      // The museum idles behind the menu: guards patrol, nobody to catch.
-      const dummy = { x: -9999, y: -9999, moving: false, sneaking: true, inShadow: () => true };
-      world.elapsed += dt;
-      for (const guard of world.guards) guard.update(dt, dummy, { onStep() {}, onShout() {} });
-      for (const camera of world.cameras) camera.update(dt, world.elapsed);
-    }
+    else if (state === 'title') idleTitle(dt);
     drawWorld(ctx, world);
   }
   requestAnimationFrame(frame);

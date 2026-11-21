@@ -1,13 +1,32 @@
 /* Velvet Hour — page chrome. A dark gallery wall around the canvas,
-   gold trim, ivory text; the game itself is painted on the canvas. */
+   gold trim, ivory text; the game itself is painted on the canvas.
+   The palette lives in custom properties so the whole page can be
+   re-tinted from one place. The engine shows panels by toggling the
+   .show class on #overlay and on one .panel at a time. */
+
+:root {
+  --page: #0b0e1a;
+  --panel-deep: #130e24;
+  --panel-high: #1b1430;
+  --gold: #c9a227;
+  --gold-bright: #ffd94d;
+  --gold-soft: #ffe9a3;
+  --ivory: #ece5d3;
+  --ivory-dim: #d9d2bd;
+  --ivory-faint: #9a917c;
+  --button: #2a2144;
+  --button-hover: #3a2d5e;
+  --eye-track: #241c3a;
+  --eye-border: #6b5a2e;
+}
 
 * { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   padding: 0;
-  background: #0b0e1a;
-  color: #ece5d3;
+  background: var(--page);
+  color: var(--ivory);
   font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -29,8 +48,8 @@ body {
   align-items: center;
   gap: 14px;
   padding: 8px 14px;
-  background: linear-gradient(180deg, #1b1430, #130e24);
-  border: 1px solid #c9a227;
+  background: linear-gradient(180deg, var(--panel-high), var(--panel-deep));
+  border: 1px solid var(--gold);
   border-radius: 10px 10px 0 0;
 }
 
@@ -38,7 +57,7 @@ body {
   font-family: Georgia, "Times New Roman", serif;
   font-weight: bold;
   letter-spacing: 2px;
-  color: #ffd94d;
+  color: var(--gold-bright);
   font-size: 19px;
   white-space: nowrap;
 }
@@ -47,10 +66,10 @@ body {
   font-size: 13.5px;
   letter-spacing: 0.4px;
   white-space: nowrap;
-  color: #d9d2bd;
+  color: var(--ivory-dim);
 }
 
-.hud-item.target { color: #ffe9a3; font-weight: 600; }
+.hud-item.target { color: var(--gold-soft); font-weight: 600; }
 .hud-item.target.secured { color: #5fe3a1; }
 
 #hud-score { font-weight: 700; color: #fff; }
@@ -63,24 +82,24 @@ body {
 .eye-track {
   width: 110px;
   height: 10px;
-  background: #241c3a;
-  border: 1px solid #6b5a2e;
+  background: var(--eye-track);
+  border: 1px solid var(--eye-border);
   border-radius: 5px;
   overflow: hidden;
 }
 #eye-fill {
   height: 100%;
   width: 0%;
-  background: #ffd94d;
+  background: var(--gold-bright);
   transition: width 120ms linear;
 }
 .eye.alarm .eye-track { border-color: #ff4a30; box-shadow: 0 0 8px rgba(255, 46, 30, 0.7); }
 
 .hud-buttons { display: flex; gap: 6px; }
 .hud-buttons button, .panel-buttons button, .level-btn {
-  background: #2a2144;
-  color: #ece5d3;
-  border: 1px solid #c9a227;
+  background: var(--button);
+  color: var(--ivory);
+  border: 1px solid var(--gold);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 12px;
@@ -88,7 +107,7 @@ body {
   cursor: pointer;
 }
 .hud-buttons button:hover, .panel-buttons button:hover, .level-btn:hover:not(:disabled) {
-  background: #3a2d5e;
+  background: var(--button-hover);
   color: #fff;
 }
 
@@ -98,33 +117,33 @@ main { line-height: 0; }
 
 canvas#game {
   display: block;
-  background: #0b0e1a;
-  border: 1px solid #c9a227;
+  background: var(--page);
+  border: 1px solid var(--gold);
   border-top: none;
 }
 
-/* The hint bar under the canvas: the contextual hint on the left, the
+/* The hint bar under the stage: the current advice on the left, the
    controls on the right. */
 
 #hintbar {
   width: 1240px;
-  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 7px 14px;
-  background: linear-gradient(180deg, #130e24, #1b1430);
-  border: 1px solid #c9a227;
-  border-top: none;
+  gap: 12px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: #101024;
+  border: 1px solid #39396a;
   border-radius: 0 0 10px 10px;
   font-size: 13.5px;
+  min-height: 40px;
 }
-#hint { color: #ffe9a3; }
-#hintbar .controls { color: #9a917c; font-size: 12px; white-space: nowrap; }
 
-/* Overlays: the dimmed full-page layer and the centred panels — title,
-   caught, cleared, complete and paused. */
+#hint { color: var(--ivory-dim); }
+#hintbar .controls { color: var(--ivory-faint); font-size: 12.5px; white-space: nowrap; }
+
+/* Overlay and panels: the dim backdrop plus one visible card. */
 
 #overlay {
   position: fixed;
@@ -132,92 +151,65 @@ canvas#game {
   display: none;
   align-items: center;
   justify-content: center;
-  background: rgba(5, 4, 12, 0.72);
+  background: rgba(5, 7, 18, 0.82);
   z-index: 10;
 }
 #overlay.show { display: flex; }
 
 .panel {
   display: none;
-  width: 620px;
+  width: 560px;
   max-width: 92vw;
-  max-height: 92vh;
-  overflow-y: auto;
-  background: linear-gradient(180deg, #1d1533, #120d22);
-  border: 2px solid #c9a227;
-  border-radius: 14px;
-  padding: 26px 34px 30px;
-  text-align: center;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(180deg, var(--panel-high), #0e0919);
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  padding: 22px 26px 20px;
+  box-shadow: 0 12px 50px rgba(0, 0, 0, 0.65);
+  line-height: 1.5;
 }
 .panel.show { display: block; }
 
-.panel h1 {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 44px;
-  letter-spacing: 6px;
-  margin: 4px 0 2px;
-  color: #ffd94d;
-}
-.panel h2 {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 27px;
-  letter-spacing: 3px;
-  margin: 4px 0 8px;
-  color: #ffd94d;
-}
-.tagline { font-style: italic; color: #cbbf9e; margin: 0 0 12px; }
-.story { font-size: 14.5px; line-height: 1.5; color: #e6dfca; }
+.panel h1, .panel h2 { margin: 0 0 8px; font-family: Georgia, serif; }
+.panel h1 { font-size: 30px; letter-spacing: 1.6px; color: var(--gold-bright); }
+.panel h2 { font-size: 23px; color: var(--gold-bright); }
+.panel p { margin: 8px 0; color: var(--ivory-dim); font-size: 14.5px; }
 
-.howto {
-  text-align: left;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: #d9d2bd;
-  margin: 14px auto 18px;
-  max-width: 520px;
-  padding-left: 20px;
-}
-.howto li { margin-bottom: 6px; }
-.howto b { color: #ffe9a3; }
+.tagline { font-weight: 600; color: var(--ivory); }
+.story { font-size: 14.5px; }
+.howto { margin: 10px 0; padding-left: 20px; font-size: 14px; color: var(--ivory-dim); }
+.howto li { margin: 4px 0; }
+.fineprint { font-size: 12.5px; color: var(--ivory-faint); }
 
-/* The gallery select: two columns of gallery buttons, locked ones dimmed. */
-#level-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-  margin: 6px auto 12px;
-  max-width: 520px;
-}
+.panel-buttons { display: flex; gap: 8px; margin-top: 14px; }
+.panel-buttons button { font-size: 13px; padding: 8px 14px; }
+#btn-next { background: #5d4815; }
+
+/* Score breakdown rows on the clear panel. */
+
+.rows { margin: 8px 0; }
+.row { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; }
+.row b { color: #fff; }
+.row:last-child { border-top: 1px solid var(--gold); margin-top: 6px; padding-top: 8px; }
+.stars { font-size: 28px; color: var(--gold-bright); letter-spacing: 4px; }
+
+/* The gallery buttons on the title screen. */
+
+#level-buttons { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .level-btn {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: center;
-  padding: 10px 8px;
-  font-size: 13px;
-}
-.level-btn b { color: #ffd94d; font-size: 13.5px; letter-spacing: 1px; }
-.level-btn span { color: #d9d2bd; }
-.level-btn:disabled { opacity: 0.38; cursor: not-allowed; }
-.level-btn.locked span::after { content: " — locked"; color: #9a917c; }
-
-.fineprint { font-size: 12px; color: #9a917c; margin: 4px 0 0; }
-
-/* The clear screen: big gold stars, then the score rows. */
-.stars { font-size: 34px; color: #ffd94d; letter-spacing: 6px; margin: 2px 0 10px; }
-
-.rows { max-width: 460px; margin: 0 auto 16px; }
-.rows .row {
-  display: flex;
   justify-content: space-between;
-  gap: 20px;
-  padding: 5px 2px;
-  border-bottom: 1px solid rgba(201, 162, 39, 0.25);
+  align-items: center;
+  width: 100%;
+  padding: 9px 12px;
   font-size: 14px;
-  color: #e6dfca;
+  background: #221a38;
 }
-.rows .row b { color: #ffd94d; font-variant-numeric: tabular-nums; }
+.level-btn:disabled { opacity: 0.4; cursor: default; }
+.level-btn.locked { opacity: 0.4; }
+.level-btn b { color: var(--gold-soft); }
+.level-btn span { color: var(--ivory-dim); }
 
-.panel-buttons { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; }
-.panel-buttons button { font-size: 13px; padding: 9px 14px; }
+/* Caught panel: the red one. */
+
+#panel-caught { border-color: #b03030; }
+#panel-caught h2 { color: #ff8a7a; }

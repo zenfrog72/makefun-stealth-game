@@ -24,17 +24,17 @@ export const LEVELS = [
       '##########################', // the north wall
       '#....C.....T.....C.......#', // target case on the north wall
       '#....C...........C....g..#', // first gem, east side
-      '#........................#',
+      '#........................#', // open floor, north patrol lane
       '#..,,....C.....C....,,...#', // rug, pedestals, rug
       '#..,,....C..g..C....,,...#', // gem between two pedestals
-      '#........................#',
+      '#........................#', // open floor, middle
       '#....##..........##......#', // the hall's inner blocks
       '#....##....,,....##...E..#', // exit on the east wall
-      '#..........,,............#',
+      '#..........,,............#', // rug, south of the blocks
       '#..g....C......C.....g...#', // gems on both flanks
-      '#.......C..,,..C.........#',
-      '#..,,...C..,,..C....,,...#',
-      '#..,,....................#',
+      '#.......C..,,..C.........#', // rug between pedestals
+      '#..,,...C..,,..C....,,...#', // rugs on both sides
+      '#..,,....................#', // rug, west edge
       '#....C.....P.......C.....#', // the thief slips in here
       '#....C.............C.....#',
       '##########################', // the south wall
@@ -61,22 +61,22 @@ export const LEVELS = [
     targetName: 'Jade Phoenix',
     par: 100,
     grid: [
-      '##########################',
+      '##########################', // the north wall
       '#..g.....S.......S.......#', // gems between the statues
       '#........S...T...S....g..#', // target case, centre north
-      '#..,,....S.......S.......#',
-      '#..,,....................#',
+      '#..,,....S.......S.......#', // rug between statues
+      '#..,,....................#', // rug, west edge
       '#.....B.....##.....B.....#', // planters and the garden wall
-      '#..g..B.....##.....B..g..#',
-      '#........................#',
+      '#..g..B.....##.....B..g..#', // gems behind the planters
+      '#........................#', // open floor, centre
       '#....,,....,,....,,......#', // three rugs in a row
       '#....,,....,,....,,...E..#', // exit, east wall
-      '#........................#',
-      '#.....B.....##.....B.....#',
-      '#..,,.B..g..##.....B..,,.#',
-      '#..,,................,,..#',
+      '#........................#', // open floor, south centre
+      '#.....B.....##.....B.....#', // planters and the garden wall
+      '#..,,.B..g..##.....B..,,.#', // gem behind a planter
+      '#..,,................,,..#', // rugs on both edges
       '#........C....P..........#', // the thief slips in here
-      '#..g.....C.........g.....#',
+      '#..g.....C.........g.....#', // gems on both flanks
       '##########################',
     ],
     guards: [
@@ -107,24 +107,24 @@ export const LEVELS = [
     targetName: 'Sun Dial',
     par: 120,
     grid: [
-      '############################',
+      '############################', // the north wall
       '#.....C......T.......C.....#', // target case, centre north
       '#..g..C..............C..g..#', // gems on both flanks
-      '#.....C..........##..C.....#',
-      '#.................##.......#',
-      '#..,,.....C......C.....,,..#',
-      '#..,,.....C..##..C.....,,..#',
-      '#................##........#',
+      '#.....C..........##..C.....#', // pedestals, vault wall
+      '#.................##.......#', // vault wall, east side
+      '#..,,.....C......C.....,,..#', // rugs on both sides
+      '#..,,.....C..##..C.....,,..#', // vault block, north
+      '#................##........#', // vault wall, middle
       '#....##....,,..........##..#', // the vault block, centre
-      '#....##....,,....C.....##..#',
-      '#..........,,....C.........#',
-      '#..g....C........C....g....#',
-      '#.......C....##..C.........#',
-      '#..,,...C....##..C....,,...#',
-      '#..,,..................,,..#',
+      '#....##....,,....C.....##..#', // vault block, pedestal east
+      '#..........,,....C.........#', // rug, pedestal
+      '#..g....C........C....g....#', // gems on both flanks
+      '#.......C....##..C.........#', // vault wall, south
+      '#..,,...C....##..C....,,...#', // rugs on both sides
+      '#..,,..................,,..#', // rugs on both edges
       '#.....C......P......C......#', // the thief slips in here
       '#..g..C.............C...E..#', // exit, south-east corner
-      '############################',
+      '############################', // the south wall
     ],
     guards: [
       {
@@ -147,7 +147,10 @@ export const LEVELS = [
       },
     ],
     cameras: [
-      { x: 13, y: 2, base: 90, sweep: 55, period: 7 },
+      {
+        x: 13, y: 2, // above the vault, sweeping down
+        base: 90, sweep: 55, period: 7,
+      },
     ],
   },
   {
@@ -156,24 +159,24 @@ export const LEVELS = [
     targetName: 'Star Sapphire',
     par: 150,
     grid: [
-      '############################',
-      '#..g.....C..........C......#',
-      '#........C....##....C...g..#',
-      '#..,,....C....##....C......#',
+      '############################', // the north wall
+      '#..g.....C..........C......#', // first gem, west side // first gem, west side
+      '#........C....##....C...g..#', // wall block, gem east
+      '#..,,....C....##....C......#', // rug, wall block
       '#..,,..........T...........#', // target case, upper middle
-      '#.....##....C.....C....##..#',
+      '#.....##....C.....C....##..#', // wall blocks, pedestals
       '#.....##....C..S..C....##..#', // the statue at the centre
-      '#................S.........#',
-      '#..,,....C....S.....C..,,..#',
-      '#..,,....C..........C..,,..#',
-      '#..........................#',
-      '#....B......##......B......#',
-      '#..g.B..,,..##..,,..B..g...#',
-      '#....B......##......B......#',
+      '#................S.........#', // statue, east of centre
+      '#..,,....C....S.....C..,,..#', // statue, rugs both sides
+      '#..,,....C..........C..,,..#', // rugs on both edges
+      '#..........................#', // open floor, centre
+      '#....B......##......B......#', // planters, wall block
+      '#..g.B..,,..##..,,..B..g...#', // gems behind planters
+      '#....B......##......B......#', // planters, wall block
       '#..,,..........P.......,,..#', // the thief slips in here
-      '#..,,....C..........C..,,..#',
+      '#..,,....C..........C..,,..#', // rugs on both edges
       '#........C....E.....C......#', // exit, south wall
-      '############################',
+      '############################', // the south wall
     ],
     guards: [
       {
@@ -202,8 +205,14 @@ export const LEVELS = [
       },
     ],
     cameras: [
-      { x: 13, y: 1, base: 90, sweep: 60, period: 8 },
-      { x: 12, y: 16, base: 270, sweep: 60, period: 9 },
+      {
+        x: 13, y: 1, // north wall, sweeping the target
+        base: 90, sweep: 60, period: 8,
+      },
+      {
+        x: 12, y: 16, // south wall, sweeping the exit
+        base: 270, sweep: 60, period: 9,
+      },
     ],
   },
 ];

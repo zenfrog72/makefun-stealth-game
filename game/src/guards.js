@@ -36,20 +36,31 @@ export function detectionRate(grid, eyeX, eyeY, facing, range, halfFov, player) 
   if (!hasLineOfSight(grid, eyeX, eyeY, player.x, player.y)) return 0;
   const inRug = player.inShadow(grid);
   if (inRug && dist > TILE * 1.6) return 0;
-  let rate = 2.4 - (dist / range) * 1.9;
+  // Closer is worse: half a point a second at the edge of the cone,
+  // 2.4 a second pressed against the guard.
+  const closeness = 1 - dist / range;
+  let rate = 0.5 + closeness * 1.9;
   if (inRug) rate *= 0.4;
   if (player.sneaking) rate *= 0.6;
   if (!player.moving) rate *= 0.85;
   return rate;
 }
 
+// clamp01 pins a suspicion meter to its legal range.
+function clamp01(value) {
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
 export class Guard {
   constructor(grid, spec) {
     this.grid = grid;
-    this.path = spec.path.map((wp) => {
+    this.path = [];
+    for (const wp of spec.path) {
       const middle = grid.tileCenter(wp.x, wp.y);
-      return { x: middle.x, y: middle.y, wait: wp.wait ?? 1 };
-    });
+      this.path.push({ x: middle.x, y: middle.y, wait: wp.wait ?? 1 });
+    }
     this.x = this.path[0].x;
     this.y = this.path[0].y;
     this.wpIndex = this.path.length > 1 ? 1 : 0;
@@ -97,14 +108,17 @@ export class Guard {
     if (sees) {
       this.lastSeen = { x: player.x, y: player.y };
       this.loseTimer = 0;
-      this.suspicion = Math.min(1, this.suspicion + rate * dt);
+      this.suspicion = clamp01(this.suspicion + rate * dt);
     } else {
       this.loseTimer += dt;
       const drain = player.inShadow(this.grid) ? 0.5 : 0.22;
+      // The meter drains at the patrol rate; a curious guard holds
+      // his nerve a little longer, a chasing guard never drops below
+      // half — the second chance is a search, not a shrug.
       if (this.mode === 'patrol' || this.mode === 'wait' || this.mode === 'return') {
-        this.suspicion = Math.max(0, this.suspicion - drain * dt);
+        this.suspicion = clamp01(this.suspicion - drain * dt);
       } else if (this.mode === 'curious') {
-        this.suspicion = Math.max(0, this.suspicion - drain * 0.8 * dt);
+        this.suspicion = clamp01(this.suspicion - drain * 0.8 * dt);
       } else if (this.mode === 'chase') {
         this.suspicion = Math.max(0.55, this.suspicion - 0.1 * dt);
       }
@@ -181,7 +195,7 @@ export class Guard {
       if (arrived) this.facing += Math.sin(this.time * 2.4) * 1.9 * dt;
       this.searchTimer -= dt;
       if (this.searchTimer <= 0) {
-        this.suspicion = Math.min(this.suspicion, 0.45);
+        if (this.suspicion > 0.45) this.suspicion = 0.45;
         this.mode = 'return';
       }
       return;
@@ -210,8 +224,11 @@ export class CameraUnit {
     this.seeing = 0;
   }
 
+  // A camera's sweep: a sine across its arc, phased by its tile so
+  // neighbouring cameras do not march in step.
   update(dt, elapsed) {
-    this.facing = this.base + Math.sin((elapsed / this.period) * Math.PI * 2 + this.phase) * this.sweep;
+    const phase = (elapsed / this.period) * Math.PI * 2 + this.phase;
+    this.facing = this.base + Math.sin(phase) * this.sweep;
   }
 
   detection(grid, player) {

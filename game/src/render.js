@@ -16,6 +16,13 @@ import {
 
 // buildStaticLayer paints everything about a level that only changes
 // when something is picked up: floor, walls, cover, cases and doors.
+// Which painter each cover character maps to.
+const COVER_PAINTERS = {
+  C: drawPedestal,
+  S: drawStatue,
+  B: drawPlanter,
+};
+
 export function buildStaticLayer(world) {
   const grid = world.grid;
   const layer = document.createElement('canvas');
@@ -36,11 +43,12 @@ export function buildStaticLayer(world) {
       else drawFloor(ctx, tx, ty);
       const cx = tx * TILE + TILE / 2;
       const cy = ty * TILE + TILE / 2;
-      if (ch === 'C') drawPedestal(ctx, tx, ty);
-      else if (ch === 'S') drawStatue(ctx, tx, ty);
-      else if (ch === 'B') drawPlanter(ctx, tx, ty);
-      else if (ch === 'E') drawExit(ctx, tx, ty, world.targetTaken);
-      else if (ch === 'g') {
+      const cover = COVER_PAINTERS[ch];
+      if (cover) {
+        cover(ctx, tx, ty);
+      } else if (ch === 'E') {
+        drawExit(ctx, tx, ty, world.targetTaken);
+      } else if (ch === 'g') {
         const gem = world.gems.get(tx + ',' + ty);
         drawGemCase(ctx, cx, cy, gem ? gem.taken : false, tx + ty);
       } else if (ch === 'T') {
@@ -69,6 +77,56 @@ function coneColour(suspicion, alpha) {
   const green = Math.round(176 - suspicion * 112);
   const blue = Math.round(66 - suspicion * 30);
   return `rgba(255, ${green}, ${blue}, ${alpha})`;
+}
+
+// paintCameras draws each camera's dome and the lens dot that follows
+// its sweep — red while it is seeing the thief.
+function paintCameras(ctx, world) {
+  for (const camera of world.cameras) {
+    ctx.fillStyle = '#23232e';
+    ctx.beginPath();
+    ctx.arc(camera.x, camera.y, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#c9a227';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    const lensX = camera.x + Math.cos(camera.facing) * 4.5;
+    const lensY = camera.y + Math.sin(camera.facing) * 4.5;
+    ctx.fillStyle = camera.seeing > 0 ? '#ff5a3c' : '#9adfff';
+    ctx.beginPath();
+    ctx.arc(lensX, lensY, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// paintFloaters draws the rising "+100" score texts, fading with age.
+function paintFloaters(ctx, world) {
+  ctx.font = 'bold 14px Georgia, serif';
+  ctx.textAlign = 'center';
+  for (const floater of world.floaters) {
+    const fade = 1 - floater.age / floater.life;
+    ctx.fillStyle = `rgba(255, 217, 77, ${fade})`;
+    ctx.fillText(floater.text, floater.x, floater.y - floater.age * 26);
+  }
+}
+
+// paintFrame adds the vignette darkening the frame's edge, and the
+// alarm's red pulse while the alarm is up.
+function paintFrame(ctx, world) {
+  const shade = ctx.createRadialGradient(620, 400, 320, 620, 400, 760);
+  shade.addColorStop(0, 'rgba(4, 4, 12, 0)');
+  shade.addColorStop(1, 'rgba(4, 4, 12, 0.38)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  if (!world.alarmActive) return;
+  const beat = Math.sin(world.elapsed * 9);
+  ctx.strokeStyle = `rgba(255, 46, 30, ${0.35 + beat * 0.18})`;
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, ctx.canvas.width - 10, ctx.canvas.height - 10);
+  ctx.fillStyle = `rgba(255, 46, 30, ${0.55 + beat * 0.2})`;
+  ctx.font = 'bold 21px Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('— ALARM —', ctx.canvas.width / 2, 34);
 }
 
 // drawWorld paints the whole frame onto the page canvas.
@@ -122,19 +180,7 @@ export function drawWorld(ctx, world) {
   }
 
   // Cameras: a dark dome and a lens dot that follows the sweep.
-  for (const camera of world.cameras) {
-    ctx.fillStyle = '#23232e';
-    ctx.beginPath();
-    ctx.arc(camera.x, camera.y, 9, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#c9a227';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = camera.seeing > 0 ? '#ff5a3c' : '#9adfff';
-    ctx.beginPath();
-    ctx.arc(camera.x + Math.cos(camera.facing) * 4.5, camera.y + Math.sin(camera.facing) * 4.5, 3.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  paintCameras(ctx, world);
 
   // Guards, then the thief, then their marks and messages.
   for (const guard of world.guards) {
@@ -147,29 +193,8 @@ export function drawWorld(ctx, world) {
   }
   drawThiefFigure(ctx, player.x, player.y, player.facing, player.sneaking, world.playerHidden);
 
-  ctx.font = 'bold 14px Georgia, serif';
-  ctx.textAlign = 'center';
-  for (const floater of world.floaters) {
-    const fade = 1 - floater.age / floater.life;
-    ctx.fillStyle = `rgba(255, 217, 77, ${fade})`;
-    ctx.fillText(floater.text, floater.x, floater.y - floater.age * 26);
-  }
+  paintFloaters(ctx, world);
   ctx.restore();
 
-  // Vignette darkening the frame's edge, and the alarm's red pulse.
-  const shade = ctx.createRadialGradient(620, 400, 320, 620, 400, 760);
-  shade.addColorStop(0, 'rgba(4, 4, 12, 0)');
-  shade.addColorStop(1, 'rgba(4, 4, 12, 0.38)');
-  ctx.fillStyle = shade;
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  if (world.alarmActive) {
-    const beat = Math.sin(world.elapsed * 9);
-    ctx.strokeStyle = `rgba(255, 46, 30, ${0.35 + beat * 0.18})`;
-    ctx.lineWidth = 10;
-    ctx.strokeRect(5, 5, ctx.canvas.width - 10, ctx.canvas.height - 10);
-    ctx.fillStyle = `rgba(255, 46, 30, ${0.55 + beat * 0.2})`;
-    ctx.font = 'bold 21px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('— ALARM —', ctx.canvas.width / 2, 34);
-  }
+  paintFrame(ctx, world);
 }

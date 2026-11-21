@@ -91,12 +91,21 @@ export class SoundEngine {
   thiefStep(sneaking) {
     const soft = sneaking ? 0.03 : 0.10;
     const pitch = sneaking ? 600 : 850;
-    this.noiseBurst({ dur: 0.045, vol: soft, freq: pitch });
+    this.noiseBurst({
+      dur: 0.045,
+      vol: soft,
+      freq: pitch,
+    });
   }
 
   guardStep(volume, pan) {
     if (volume <= 0.01) return;
-    this.noiseBurst({ dur: 0.06, vol: volume * 0.22, freq: 420, pan });
+    this.noiseBurst({
+      dur: 0.06,
+      vol: volume * 0.22,
+      freq: 420,
+      pan,
+    });
   }
 
   // suspicionTick is the rising warning while a guard's meter climbs;
@@ -106,44 +115,73 @@ export class SoundEngine {
     const now = performance.now();
     if (now - this.lastTickAt < 170) return;
     this.lastTickAt = now;
-    this.tone({ freq: 500 + level * 500, dur: 0.07, type: 'triangle', vol: 0.05 + level * 0.06 });
+    this.tone({
+      freq: 500 + level * 500,
+      dur: 0.07,
+      type: 'triangle',
+      vol: 0.05 + level * 0.06,
+    });
   }
 
+  // shout: two saws a fifth apart, the second a beat behind.
   shout() {
-    this.tone({ freq: 220, dur: 0.28, type: 'sawtooth', vol: 0.16, slideTo: 440 });
-    this.tone({ freq: 277, dur: 0.28, type: 'square', vol: 0.07, slideTo: 554, delay: 0.02 });
+    this.tone({
+      freq: 220, dur: 0.28, type: 'sawtooth', vol: 0.16, slideTo: 440,
+    });
+    this.tone({
+      freq: 277, dur: 0.28, type: 'square', vol: 0.07, slideTo: 554, delay: 0.02,
+    });
   }
 
   alarmBeep() {
-    this.tone({ freq: 880, dur: 0.11, type: 'square', vol: 0.06 });
-    this.tone({ freq: 660, dur: 0.11, type: 'square', vol: 0.06, delay: 0.14 });
+    this.tone({
+      freq: 880, dur: 0.11, type: 'square', vol: 0.06,
+    });
+    this.tone({
+      freq: 660, dur: 0.11, type: 'square', vol: 0.06, delay: 0.14,
+    });
   }
 
   pickup() {
-    this.tone({ freq: 880, dur: 0.09, type: 'sine', vol: 0.14 });
-    this.tone({ freq: 1318, dur: 0.14, type: 'sine', vol: 0.12, delay: 0.06 });
+    this.tone({
+      freq: 880, dur: 0.09, type: 'sine', vol: 0.14,
+    });
+    this.tone({
+      freq: 1318, dur: 0.14, type: 'sine', vol: 0.12, delay: 0.06,
+    });
+  }
+
+  // A little arpeggio, one note at a time, for the target and the win.
+  playArpeggio(notes, dur, gap) {
+    let i = 0;
+    for (const freq of notes) {
+      this.tone({
+        freq, dur, type: 'triangle', vol: 0.13, delay: i * gap,
+      });
+      i++;
+    }
   }
 
   targetPickup() {
-    const notes = [523, 659, 784, 1046];
-    notes.forEach((freq, i) => {
-      this.tone({ freq, dur: 0.16, type: 'triangle', vol: 0.13, delay: i * 0.07 });
-    });
+    this.playArpeggio([523, 659, 784, 1046], 0.16, 0.07);
   }
 
   caught() {
-    this.tone({ freq: 196, dur: 0.4, type: 'sawtooth', vol: 0.16, slideTo: 65 });
-    this.noiseBurst({ dur: 0.2, vol: 0.14, freq: 300 });
-  }
-
-  clearJingle() {
-    const notes = [392, 523, 659, 784];
-    notes.forEach((freq, i) => {
-      this.tone({ freq, dur: 0.22, type: 'triangle', vol: 0.12, delay: i * 0.09 });
+    this.tone({
+      freq: 196, dur: 0.4, type: 'sawtooth', vol: 0.16, slideTo: 65,
+    });
+    this.noiseBurst({
+      dur: 0.2, vol: 0.14, freq: 300,
     });
   }
 
+  clearJingle() {
+    this.playArpeggio([392, 523, 659, 784], 0.22, 0.09);
+  }
+
   click() {
-    this.tone({ freq: 660, dur: 0.05, type: 'triangle', vol: 0.08 });
+    this.tone({
+      freq: 660, dur: 0.05, type: 'triangle', vol: 0.08,
+    });
   }
 }

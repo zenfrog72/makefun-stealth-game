@@ -37,7 +37,8 @@ export class Player {
 
   // True while she stands on a rug — the museum's dark carpets.
   inShadow(grid) {
-    return this.tileChar(grid) === ',';
+    const ch = this.tileChar(grid);
+    return ch === ',';
   }
 
   // update moves her one frame from an input of { x, y } travel
@@ -52,12 +53,16 @@ export class Player {
       return;
     }
     const pace = this.sneaking ? SNEAK_SPEED : WALK_SPEED;
-    const stepX = (input.x / reach) * pace * dt;
-    const stepY = (input.y / reach) * pace * dt;
+    const unitX = input.x / reach;
+    const unitY = input.y / reach;
+    const stepX = unitX * pace * dt;
+    const stepY = unitY * pace * dt;
+    const beforeX = this.x;
+    const beforeY = this.y;
     const after = slideMove(grid, this.x, this.y, this.radius, stepX, stepY);
-    const covered = Math.hypot(after.x - this.x, after.y - this.y);
     this.x = after.x;
     this.y = after.y;
+    const covered = Math.hypot(this.x - beforeX, this.y - beforeY);
     if (covered > 0.01) this.facing = Math.atan2(stepY, stepX);
     this.stepTimer -= dt;
     if (this.stepTimer <= 0) {
