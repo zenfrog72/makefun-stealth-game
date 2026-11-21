@@ -234,23 +234,25 @@ function updatePlay(dt) {
   const cameraRate = updateCameras(dt);
 
   // How exposed is the thief right now? It drives the glow and the eye.
-  let worstSuspicion = 0;
-  let seen = cameraRate > 0;
-  for (const guard of world.guards) {
-    if (guard.suspicion > worstSuspicion) worstSuspicion = guard.suspicion;
+  // A guard counts as seeing her while his cone holds her; a guard in
+  // chase or search counts as seeing her whether or not it does.
+  const exposures = world.guards.map((guard) => {
     const rate = detectionRate(grid, guard.x, guard.y, guard.facing, GUARD_RANGE, GUARD_HALF_FOV, player);
-    if (rate > 0) seen = true;
-    if (guard.mode === 'chase' || guard.mode === 'search') seen = true;
-  }
+    const alerted = guard.mode === 'chase' || guard.mode === 'search';
+    return { suspicion: guard.suspicion, seen: rate > 0 || alerted };
+  });
+  const worstSuspicion = exposures.reduce((worst, e) => Math.max(worst, e.suspicion), 0);
+  const seen = cameraRate > 0 || exposures.some((e) => e.seen);
   world.playerHidden = !seen;
   world.maxSuspicion = worstSuspicion;
   if (worstSuspicion >= 0.35 && worstSuspicion < 1) sound.suspicionTick(worstSuspicion);
 
   // Caught: an alerted guard lays a hand on the thief.
-  for (const guard of world.guards) {
+  const caughtBy = world.guards.find((guard) => {
     const gap = Math.hypot(guard.x - player.x, guard.y - player.y);
-    if (guard.mode === 'chase' && gap < 30) return onCaught();
-  }
+    return guard.mode === 'chase' && gap < 30;
+  });
+  if (caughtBy) return onCaught();
 
   // Pickups and the exit, by the tile under the thief's feet.
   const tx = player.tileX();
@@ -295,15 +297,17 @@ function onCleared() {
   const stars = 1 + (allGems ? 1 : 0) + (allGems && world.ghost ? 1 : 0);
   document.getElementById('clear-title').textContent = world.level.name + ' — cleared';
   document.getElementById('clear-stars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-  const rows = [
-    [`The ${world.targetName}`, '+500'],
-    [`Gems — ${world.gemsTaken} of ${world.gemTotal}`, '+' + world.gemsTaken * 100],
-    [`Time bonus (${clockText(world.elapsed)} against par ${clockText(world.level.par)})`, '+' + timeBonus],
-    [world.ghost ? 'Ghost bonus — never truly seen' : 'Ghost bonus — you were seen', '+' + ghostBonus],
-    ['Total score', String(world.score)],
-  ];
+  // The breakdown: one row per source of points, then the total.
+  const breakdown = [];
+  breakdown.push([`The ${world.targetName}`, 500]);
+  breakdown.push([`Gems — ${world.gemsTaken} of ${world.gemTotal}`, world.gemsTaken * 100]);
+  breakdown.push([`Time bonus (${clockText(world.elapsed)} against par ${clockText(world.level.par)})`, timeBonus]);
+  breakdown.push([world.ghost ? 'Ghost bonus — never truly seen' : 'Ghost bonus — you were seen', ghostBonus]);
+  const rowsHtml = breakdown
+    .map(([label, points]) => `<div class="row"><span>${label}</span><b>+${points}</b></div>`)
+    .join('');
   document.getElementById('clear-rows').innerHTML =
-    rows.map(([label, value]) => `<div class="row"><span>${label}</span><b>${value}</b></div>`).join('');
+    rowsHtml + `<div class="row"><span>Total score</span><b>${world.score}</b></div>`;
   document.getElementById('btn-next').textContent =
     levelIndex + 1 < LEVELS.length ? 'Next gallery →' : 'Finish the night →';
   setPanel('clear');
@@ -450,76 +454,94 @@ function refreshLevelButtons() {
 
 // ------------------------------------------------------- staged captures
 
-// stageShot freezes one composed moment of the game for its maker to
-// photograph — the starter's ?shot= hook, kept. Each scene is a real
-// state of the real game (posed figures, real cones), never a drawing.
+// The four staged scenes, as data: which gallery, how far in, which
+// gems are already lifted, where the thief stands and how she faces,
+// where each posed guard stands, and what the hint bar says. stageShot
+// below poses the real game from one of these rows — the starter's
+// ?shot= hook, kept. Each scene is a real state of the real game (posed
+// figures, real cones), never a drawing.
+const SHOT_SCENES = {
+  cover: {
+    level: 0, elapsed: 42, gems: [[3, 10], [12, 5]],
+    thief: { tx: 11, ty: 8, facing: Math.PI, sneaking: true },
+    guards: [{ i: 0, tx: 15, ty: 3, faceThief: true, suspicion: 0.45, mode: 'curious' }],
+    maxSuspicion: 0.45,
+    hint: 'A guard is suspicious — slip behind cover and let him cool down.',
+  },
+  vault: {
+    level: 2, elapsed: 68, gems: [[3, 2], [24, 2]],
+    thief: { tx: 19, ty: 7, facing: Math.PI, sneaking: true },
+    cameraFacing: 0.45,
+    guards: [{ i: 1, tx: 14, ty: 8, facing: Math.PI, suspicion: 0.12 }],
+    maxSuspicion: 0.12,
+    hint: 'One camera watches the vault — cross while its cone sweeps away.',
+  },
+  alarm: {
+    level: 1, elapsed: 57, gems: [[3, 1], [22, 2]],
+    thief: { tx: 17, ty: 4, facing: 0, moving: true },
+    guards: [
+      { i: 0, tx: 13, ty: 4, facing: 0, suspicion: 1, mode: 'chase' },
+      { i: 2, suspicion: 0.5 },
+    ],
+    maxSuspicion: 1, alarm: true,
+    hint: 'RUN — and break his line of sight. He will search where he last saw you.',
+  },
+  clear: {
+    level: 0, elapsed: 52, allGems: true, target: true, score: 1880,
+    showClear: true,
+  },
+};
+
 function stageShot(name) {
-  const pose = (index) => {
-    levelIndex = index;
-    world = makeWorld(index);
-    world.score = 0;
-    state = 'pose';
-    world.state = 'pose';
-    setPanel(null);
-  };
-  const place = (figure, tx, ty, facing) => {
-    const middle = world.grid.tileCenter(tx, ty);
-    figure.x = middle.x;
-    figure.y = middle.y;
-    figure.facing = facing;
-  };
-  if (name === 'cover') {
-    pose(0);
-    takeGemSilent(3, 10);
-    takeGemSilent(12, 5);
-    world.elapsed = 42;
-    place(world.player, 11, 8, Math.PI);
-    world.player.sneaking = true;
-    const guard = world.guards[0];
-    place(guard, 15, 3, 0);
-    guard.facing = Math.atan2(world.player.y - guard.y, world.player.x - guard.x);
-    guard.suspicion = 0.45;
-    guard.mode = 'curious';
-    world.maxSuspicion = 0.45;
-    flashHint('A guard is suspicious — slip behind cover and let him cool down.', 999);
-  } else if (name === 'vault') {
-    pose(2);
-    takeGemSilent(3, 2);
-    takeGemSilent(24, 2);
-    world.elapsed = 68;
-    place(world.player, 19, 7, Math.PI);
-    world.player.sneaking = true;
-    const camera = world.cameras[0];
-    camera.facing = camera.base + 0.45;
-    const guard = world.guards[1];
-    place(guard, 14, 8, Math.PI);
-    guard.suspicion = 0.12;
-    world.maxSuspicion = 0.12;
-    flashHint('One camera watches the vault — cross while its cone sweeps away.', 999);
-  } else if (name === 'alarm') {
-    pose(1);
-    takeGemSilent(3, 1);
-    takeGemSilent(22, 2);
-    world.elapsed = 57;
-    place(world.player, 17, 4, 0);
-    world.player.moving = true;
-    const guard = world.guards[0];
-    place(guard, 13, 4, 0);
-    guard.suspicion = 1;
-    guard.mode = 'chase';
-    world.guards[2].suspicion = 0.5;
-    world.maxSuspicion = 1;
-    world.alarmActive = true;
-    flashHint('RUN — and break his line of sight. He will search where he last saw you.', 999);
-  } else if (name === 'clear') {
-    pose(0);
+  const scene = SHOT_SCENES[name];
+  if (!scene) return;
+  levelIndex = scene.level;
+  world = makeWorld(scene.level);
+  world.score = 0;
+  state = 'pose';
+  world.state = 'pose';
+  setPanel(null);
+  for (const [gx, gy] of scene.gems ?? []) takeGemSilent(gx, gy);
+  if (scene.allGems) {
     for (const gem of world.gems.values()) gem.taken = true;
     world.gemsTaken = world.gemTotal;
+  }
+  if (scene.target) {
     world.targetTaken = true;
     world.staticDirty = true;
-    world.elapsed = 52;
-    world.score = 1880;
-    state = 'pose';
+  }
+  world.elapsed = scene.elapsed;
+  world.score = scene.score ?? world.score;
+  if (scene.thief) {
+    const middle = world.grid.tileCenter(scene.thief.tx, scene.thief.ty);
+    world.player.x = middle.x;
+    world.player.y = middle.y;
+    world.player.facing = scene.thief.facing;
+    world.player.sneaking = Boolean(scene.thief.sneaking);
+    world.player.moving = Boolean(scene.thief.moving);
+  }
+  for (const pose of scene.guards ?? []) {
+    const guard = world.guards[pose.i];
+    if (pose.tx !== undefined) {
+      const middle = world.grid.tileCenter(pose.tx, pose.ty);
+      guard.x = middle.x;
+      guard.y = middle.y;
+    }
+    if (pose.faceThief) {
+      guard.facing = Math.atan2(world.player.y - guard.y, world.player.x - guard.x);
+    } else if (pose.facing !== undefined) {
+      guard.facing = pose.facing;
+    }
+    if (pose.suspicion !== undefined) guard.suspicion = pose.suspicion;
+    if (pose.mode) guard.mode = pose.mode;
+  }
+  if (scene.cameraFacing !== undefined && world.cameras[0]) {
+    world.cameras[0].facing = world.cameras[0].base + scene.cameraFacing;
+  }
+  if (scene.maxSuspicion !== undefined) world.maxSuspicion = scene.maxSuspicion;
+  if (scene.alarm) world.alarmActive = true;
+  if (scene.hint) flashHint(scene.hint, 999);
+  if (scene.showClear) {
     document.getElementById('clear-title').textContent = 'The Marble Hall — cleared';
     document.getElementById('clear-stars').textContent = '★★★';
     document.getElementById('clear-rows').innerHTML = [

@@ -6,6 +6,10 @@
 // crimson guards against both, a teal thief, amber cones. Decorative
 // detail (marble veins, rug diamonds) is seeded by tile coordinates, so
 // every render of a level comes out identical.
+//
+// Two tiny helpers do most of the drawing: box() fills a rectangle in
+// one colour, disc() fills a circle, and ring() strokes one. The
+// painters below read as a list of shapes, not a list of canvas calls.
 
 import { TILE } from './vision.js';
 
@@ -21,14 +25,35 @@ export function tileSeed(tx, ty) {
 export const INK = '#241f2e';
 export const GOLD = '#c9a227';
 
+// box fills a rectangle in the given colour.
+function box(ctx, x, y, w, h, style) {
+  ctx.fillStyle = style;
+  ctx.fillRect(x, y, w, h);
+}
+
+// disc fills a circle in the given colour.
+function disc(ctx, x, y, r, style) {
+  ctx.fillStyle = style;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ring strokes a circle in the given colour and width.
+function ring(ctx, x, y, r, style, width) {
+  ctx.strokeStyle = style;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
 // One lit marble tile: two alternating ivory tones, a grout line, and —
 // on seeded tiles — a single faint vein stroke across the diagonal.
 export function drawFloor(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
-  const even = (tx + ty) % 2 === 0;
-  ctx.fillStyle = even ? '#ddd3bf' : '#d3c8b0';
-  ctx.fillRect(x, y, TILE, TILE);
+  box(ctx, x, y, TILE, TILE, (tx + ty) % 2 === 0 ? '#ddd3bf' : '#d3c8b0');
   ctx.strokeStyle = 'rgba(120, 105, 80, 0.35)';
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
@@ -46,8 +71,7 @@ export function drawFloor(ctx, tx, ty) {
 export function drawRug(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
-  ctx.fillStyle = '#571f31';
-  ctx.fillRect(x, y, TILE, TILE);
+  box(ctx, x, y, TILE, TILE, '#571f31');
   ctx.strokeStyle = 'rgba(20, 6, 12, 0.55)';
   ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
   ctx.fillStyle = 'rgba(201, 162, 39, 0.5)';
@@ -63,14 +87,10 @@ export function drawRug(ctx, tx, ty) {
 export function drawWall(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
-  ctx.fillStyle = '#3a2c44';
-  ctx.fillRect(x, y, TILE, TILE);
-  ctx.fillStyle = '#54436a';
-  ctx.fillRect(x, y, TILE, 9);
-  ctx.fillStyle = 'rgba(201, 162, 39, 0.65)';
-  ctx.fillRect(x, y + 9, TILE, 2);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-  ctx.fillRect(x, y + TILE - 5, TILE, 5);
+  box(ctx, x, y, TILE, TILE, '#3a2c44');
+  box(ctx, x, y, TILE, 9, '#54436a');
+  box(ctx, x, y + 9, TILE, 2, 'rgba(201, 162, 39, 0.65)');
+  box(ctx, x, y + TILE - 5, TILE, 5, 'rgba(0, 0, 0, 0.25)');
 }
 
 // A display pedestal (cover): stone body, gold band, and a small
@@ -78,20 +98,13 @@ export function drawWall(ctx, tx, ty) {
 export function drawPedestal(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.fillRect(x + 3, y + TILE - 7, TILE - 4, 5);
-  ctx.fillStyle = '#8d8578';
-  ctx.fillRect(x + 5, y + 10, TILE - 10, TILE - 12);
-  ctx.fillStyle = '#a39a89';
-  ctx.fillRect(x + 3, y + 4, TILE - 6, 8);
-  ctx.fillStyle = GOLD;
-  ctx.fillRect(x + 3, y + 12, TILE - 6, 2);
+  box(ctx, x + 3, y + TILE - 7, TILE - 4, 5, 'rgba(0,0,0,0.18)');
+  box(ctx, x + 5, y + 10, TILE - 10, TILE - 12, '#8d8578');
+  box(ctx, x + 3, y + 4, TILE - 6, 8, '#a39a89');
+  box(ctx, x + 3, y + 12, TILE - 6, 2, GOLD);
   const seed = tileSeed(tx, ty);
   const orb = seed > 0.66 ? '#7fb3c8' : seed > 0.33 ? '#c87f9a' : '#9ac87f';
-  ctx.fillStyle = orb;
-  ctx.beginPath();
-  ctx.arc(x + TILE / 2, y + 1, 4.5, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, x + TILE / 2, y + 1, 4.5, orb);
 }
 
 // A statue (tall cover): plinth and a robed figure rising from it.
@@ -99,14 +112,10 @@ export function drawStatue(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
   const cx = x + TILE / 2;
-  ctx.fillStyle = 'rgba(0,0,0,0.20)';
-  ctx.fillRect(x + 2, y + TILE - 6, TILE - 3, 5);
-  ctx.fillStyle = '#6f6a72';
-  ctx.fillRect(x + 6, y + TILE - 12, TILE - 12, 10);
+  box(ctx, x + 2, y + TILE - 6, TILE - 3, 5, 'rgba(0,0,0,0.20)');
+  box(ctx, x + 6, y + TILE - 12, TILE - 12, 10, '#6f6a72');
+  disc(ctx, cx, y + 9, 6, '#8b8694');
   ctx.fillStyle = '#8b8694';
-  ctx.beginPath();
-  ctx.arc(cx, y + 9, 6, 0, Math.PI * 2);
-  ctx.fill();
   ctx.beginPath();
   ctx.moveTo(cx - 8, y + TILE - 12);
   ctx.quadraticCurveTo(cx - 6, y + 14, cx, y + 13);
@@ -119,22 +128,11 @@ export function drawStatue(ctx, tx, ty) {
 export function drawPlanter(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
-  ctx.fillStyle = '#9a5a3c';
-  ctx.fillRect(x + 4, y + TILE - 13, TILE - 8, 10);
+  box(ctx, x + 4, y + TILE - 13, TILE - 8, 10, '#9a5a3c');
   const dark = [[13, 15, 10], [27, 13, 11], [20, 22, 12], [11, 24, 8], [29, 24, 8]];
   const light = [[16, 14, 6], [25, 18, 7], [20, 10, 5]];
-  ctx.fillStyle = '#2e6b3e';
-  for (const blob of dark) {
-    ctx.beginPath();
-    ctx.arc(x + blob[0], y + blob[1], blob[2], 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.fillStyle = '#3c8a50';
-  for (const blob of light) {
-    ctx.beginPath();
-    ctx.arc(x + blob[0], y + blob[1], blob[2], 0, Math.PI * 2);
-    ctx.fill();
-  }
+  for (const blob of dark) disc(ctx, x + blob[0], y + blob[1], blob[2], '#2e6b3e');
+  for (const blob of light) disc(ctx, x + blob[0], y + blob[1], blob[2], '#3c8a50');
 }
 
 // A glass loot case at a tile centre: pale glass box and the coloured
@@ -143,8 +141,7 @@ const GEM_HUES = ['#57c7e3', '#e3577a', '#7ae38a', '#e3c357', '#b57ae3', '#e38a5
 export function drawGemCase(ctx, cx, cy, taken, seedIndex) {
   const glass = taken ? 'rgba(160, 170, 180, 0.25)' : 'rgba(170, 220, 240, 0.30)';
   const edge = taken ? 'rgba(120, 125, 135, 0.5)' : 'rgba(220, 245, 255, 0.85)';
-  ctx.fillStyle = glass;
-  ctx.fillRect(cx - 13, cy - 13, 26, 26);
+  box(ctx, cx - 13, cy - 13, 26, 26, glass);
   ctx.strokeStyle = edge;
   ctx.lineWidth = 1.5;
   ctx.strokeRect(cx - 13, cy - 13, 26, 26);
@@ -164,8 +161,7 @@ export function drawGemCase(ctx, cx, cy, taken, seedIndex) {
 export function drawTargetCase(ctx, cx, cy, taken, pulse) {
   const glass = taken ? 'rgba(160, 170, 180, 0.22)' : 'rgba(255, 226, 140, 0.28)';
   const edge = taken ? 'rgba(120, 125, 135, 0.5)' : GOLD;
-  ctx.fillStyle = glass;
-  ctx.fillRect(cx - 16, cy - 16, 32, 32);
+  box(ctx, cx - 16, cy - 16, 32, 32, glass);
   ctx.strokeStyle = edge;
   ctx.lineWidth = 2;
   ctx.strokeRect(cx - 16, cy - 16, 32, 32);
@@ -199,8 +195,7 @@ export function drawExit(ctx, tx, ty, open) {
   spill.addColorStop(1, 'rgba(64, 224, 150, 0)');
   ctx.fillStyle = spill;
   ctx.fillRect(x - 2, y - 14, TILE + 4, TILE + 14);
-  ctx.fillStyle = open ? '#1f9d63' : '#17694a';
-  ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 3);
+  box(ctx, x + 3, y + 3, TILE - 6, TILE - 3, open ? '#1f9d63' : '#17694a');
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 3, y + 3, TILE - 6, TILE - 3);
@@ -213,8 +208,7 @@ export function drawExit(ctx, tx, ty, open) {
   ctx.textAlign = 'center';
   ctx.fillText('EXIT', x + TILE / 2, y + 12);
   if (open) return;
-  ctx.fillStyle = '#2b2b33';
-  ctx.fillRect(x + TILE / 2 - 4, y + TILE / 2 + 1, 8, 7);
+  box(ctx, x + TILE / 2 - 4, y + TILE / 2 + 1, 8, 7, '#2b2b33');
   ctx.strokeStyle = '#cfd3da';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -225,34 +219,22 @@ export function drawExit(ctx, tx, ty, open) {
 // One guard: crimson coat, gold trim, peaked cap, facing the given
 // heading. Full suspicion tints the trim alarm red.
 export function drawGuardFigure(ctx, x, y, facing, suspicion) {
+  // The shadow is an ellipse, not a disc, so it is painted by hand.
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.beginPath();
   ctx.ellipse(x, y + 11, 12, 5, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#a31621';
-  ctx.beginPath();
-  ctx.arc(x, y, 13, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = suspicion >= 1 ? '#ff5a3c' : GOLD;
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  disc(ctx, x, y, 13, '#a31621');
+  ring(ctx, x, y, 13, suspicion >= 1 ? '#ff5a3c' : GOLD, 2);
   // Shoulders and cap, rotated to the heading.
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(facing);
-  ctx.fillStyle = '#7d1019';
-  ctx.fillRect(2, -10, 9, 20);
-  ctx.fillStyle = '#2b2b33';
-  ctx.beginPath();
-  ctx.arc(3, 0, 6.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = GOLD;
-  ctx.fillRect(7, -4.5, 4, 9);
+  box(ctx, 2, -10, 9, 20, '#7d1019');
+  disc(ctx, 3, 0, 6.5, '#2b2b33');
+  box(ctx, 7, -4.5, 4, 9, GOLD);
   ctx.restore();
-  ctx.fillStyle = '#f3d9c8';
-  ctx.beginPath();
-  ctx.arc(x + Math.cos(facing) * 4, y + Math.sin(facing) * 4, 4.6, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, x + Math.cos(facing) * 4, y + Math.sin(facing) * 4, 4.6, '#f3d9c8');
 }
 
 // The player: a teal hooded figure with a satchel; while hidden she
@@ -264,13 +246,8 @@ export function drawThiefFigure(ctx, x, y, facing, sneaking, hidden) {
   ctx.beginPath();
   ctx.ellipse(x, y + 11, 11, 4.6, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = sneaking ? '#0f5e63' : '#12808a';
-  ctx.beginPath();
-  ctx.arc(x, y, 12, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#0a3d42';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  disc(ctx, x, y, 12, sneaking ? '#0f5e63' : '#12808a');
+  ring(ctx, x, y, 12, '#0a3d42', 2);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(facing);
@@ -282,26 +259,17 @@ export function drawThiefFigure(ctx, x, y, facing, sneaking, hidden) {
   ctx.lineTo(2, 7.5);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = '#e8c39a';
-  ctx.beginPath();
-  ctx.arc(3.5, 0, 4.2, 0, Math.PI * 2);
-  ctx.fill();
+  disc(ctx, 3.5, 0, 4.2, '#e8c39a');
   // Satchel on the back.
-  ctx.fillStyle = '#8a5a2b';
-  ctx.fillRect(-11, -4, 6, 8);
+  box(ctx, -11, -4, 6, 8, '#8a5a2b');
   ctx.restore();
   ctx.globalAlpha = 1;
 }
 
 // The "?" or "!" bubble over a guard's head.
 export function drawSpeechMark(ctx, x, y, mark, colour) {
-  ctx.fillStyle = 'rgba(255, 252, 240, 0.95)';
-  ctx.beginPath();
-  ctx.arc(x, y, 9, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = colour;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  disc(ctx, x, y, 9, 'rgba(255, 252, 240, 0.95)');
+  ring(ctx, x, y, 9, colour, 1.5);
   ctx.fillStyle = colour;
   ctx.font = 'bold 13px Georgia, serif';
   ctx.textAlign = 'center';
