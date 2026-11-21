@@ -1,7 +1,7 @@
 // sound.js — the whole soundscape, synthesised with WebAudio.
 //
-// No audio files: footsteps are filtered noise ticks, the suspicion sting
-// is a rising brass blip, pickups are sine chimes. Guard footsteps are
+// No audio files: footsteps are filtered noise ticks, the suspicion
+// sting is a rising blip, pickups are sine chimes. Guard footsteps are
 // panned and faded by where the guard is relative to the thief, so your
 // ears tell you where a patrol is before your eyes do — keep them open.
 
@@ -13,7 +13,7 @@ export class SoundEngine {
     this.lastTickAt = 0;
   }
 
-  // ensure creates the context on the first user gesture that asks for
+  // ensure builds the context on the first user gesture that asks for
   // sound; browsers refuse to start audio before one.
   ensure() {
     if (this.context) {
@@ -34,44 +34,7 @@ export class SoundEngine {
     if (this.master) this.master.gain.value = muted ? 0 : 0.5;
   }
 
-  // tone plays one oscillator note with an envelope; slideTo bends it.
-  tone({ freq = 440, dur = 0.15, type = 'sine', vol = 0.2, slideTo = null, delay = 0, pan = 0 }) {
-    if (!this.context || this.muted) return;
-    const t0 = this.context.currentTime + delay;
-    const osc = this.context.createOscillator();
-    const gain = this.context.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t0);
-    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
-    gain.gain.setValueAtTime(0, t0);
-    gain.gain.linearRampToValueAtTime(vol, t0 + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-    this.route(osc, gain, pan);
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.05);
-  }
-
-  // noiseBurst plays a short filtered noise tick — the footstep sound.
-  noiseBurst({ dur = 0.05, vol = 0.15, freq = 900, pan = 0 }) {
-    if (!this.context || this.muted) return;
-    const t0 = this.context.currentTime;
-    const length = Math.max(1, Math.floor(this.context.sampleRate * dur));
-    const buffer = this.context.createBuffer(1, length, this.context.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
-    const source = this.context.createBufferSource();
-    source.buffer = buffer;
-    const filter = this.context.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = freq;
-    const gain = this.context.createGain();
-    gain.gain.value = vol;
-    source.connect(filter);
-    this.route(filter, gain, pan);
-    source.start(t0);
-  }
-
-  // route connects a chain to the master bus, through a stereo panner
+  // route plugs a chain into the master bus, through a stereo panner
   // when the browser offers one.
   route(input, gain, pan) {
     input.connect(gain);
@@ -85,8 +48,50 @@ export class SoundEngine {
     }
   }
 
+  // tone plays a single oscillator note with a quick attack and an
+  // exponential fall; slideTo bends its pitch across the note.
+  tone({ freq = 440, dur = 0.15, type = 'sine', vol = 0.2, slideTo = null, delay = 0, pan = 0 }) {
+    if (!this.context || this.muted) return;
+    const start = this.context.currentTime + delay;
+    const osc = this.context.createOscillator();
+    const gain = this.context.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, start);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, start + dur);
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(vol, start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    this.route(osc, gain, pan);
+    osc.start(start);
+    osc.stop(start + dur + 0.05);
+  }
+
+  // noiseBurst plays a short filtered noise tick — the footstep sound.
+  noiseBurst({ dur = 0.05, vol = 0.15, freq = 900, pan = 0 }) {
+    if (!this.context || this.muted) return;
+    const start = this.context.currentTime;
+    const count = Math.max(1, Math.floor(this.context.sampleRate * dur));
+    const buffer = this.context.createBuffer(1, count, this.context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < count; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / count);
+    }
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+    const filter = this.context.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = freq;
+    const gain = this.context.createGain();
+    gain.gain.value = vol;
+    source.connect(filter);
+    this.route(filter, gain, pan);
+    source.start(start);
+  }
+
   thiefStep(sneaking) {
-    this.noiseBurst({ dur: 0.045, vol: sneaking ? 0.03 : 0.10, freq: sneaking ? 600 : 850 });
+    const soft = sneaking ? 0.03 : 0.10;
+    const pitch = sneaking ? 600 : 850;
+    this.noiseBurst({ dur: 0.045, vol: soft, freq: pitch });
   }
 
   guardStep(volume, pan) {
@@ -95,7 +100,8 @@ export class SoundEngine {
   }
 
   // suspicionTick is the rising warning while a guard's meter climbs;
-  // its pitch follows the highest suspicion in the room.
+  // its pitch follows the highest suspicion in the room, throttled so
+  // it never becomes a drone.
   suspicionTick(level) {
     const now = performance.now();
     if (now - this.lastTickAt < 170) return;
@@ -119,9 +125,10 @@ export class SoundEngine {
   }
 
   targetPickup() {
-    for (const [i, freq] of [523, 659, 784, 1046].entries()) {
+    const notes = [523, 659, 784, 1046];
+    notes.forEach((freq, i) => {
       this.tone({ freq, dur: 0.16, type: 'triangle', vol: 0.13, delay: i * 0.07 });
-    }
+    });
   }
 
   caught() {
@@ -130,9 +137,10 @@ export class SoundEngine {
   }
 
   clearJingle() {
-    for (const [i, freq] of [392, 523, 659, 784].entries()) {
+    const notes = [392, 523, 659, 784];
+    notes.forEach((freq, i) => {
       this.tone({ freq, dur: 0.22, type: 'triangle', vol: 0.12, delay: i * 0.09 });
-    }
+    });
   }
 
   click() {

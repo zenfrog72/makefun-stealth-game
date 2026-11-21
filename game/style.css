@@ -1,5 +1,5 @@
-/* Velvet Hour — page chrome: a dark gallery wall around the canvas,
-   gold trim, ivory text. The game itself is painted on the canvas. */
+/* Velvet Hour — page chrome. A dark gallery wall around the canvas,
+   gold trim, ivory text; the game itself is painted on the canvas. */
 
 * { box-sizing: border-box; }
 
@@ -18,7 +18,8 @@ body {
   min-height: 100vh;
 }
 
-/* ---------------------------------------------------------------- HUD */
+/* The HUD bar: brand, gallery, target, gems, score, timer, the eye
+   meter, and the pause / restart / sound buttons. */
 
 #hud {
   width: 1240px;
@@ -55,6 +56,8 @@ body {
 #hud-score { font-weight: 700; color: #fff; }
 #hud-time { font-variant-numeric: tabular-nums; }
 
+/* The eye meter: a track that fills with the worst suspicion in the
+   room, amber to red, with an alarm glow around it when the alarm is up. */
 .eye { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .eye-label { font-size: 15px; }
 .eye-track {
@@ -89,7 +92,7 @@ body {
   color: #fff;
 }
 
-/* -------------------------------------------------------------- stage */
+/* The stage: the canvas itself, gold-framed. */
 
 main { line-height: 0; }
 
@@ -100,7 +103,8 @@ canvas#game {
   border-top: none;
 }
 
-/* ------------------------------------------------------------ hintbar */
+/* The hint bar under the canvas: the contextual hint on the left, the
+   controls on the right. */
 
 #hintbar {
   width: 1240px;
@@ -119,7 +123,8 @@ canvas#game {
 #hint { color: #ffe9a3; }
 #hintbar .controls { color: #9a917c; font-size: 12px; white-space: nowrap; }
 
-/* ------------------------------------------------------------ overlay */
+/* Overlays: the dimmed full-page layer and the centred panels — title,
+   caught, cleared, complete and paused. */
 
 #overlay {
   position: fixed;
@@ -176,6 +181,7 @@ canvas#game {
 .howto li { margin-bottom: 6px; }
 .howto b { color: #ffe9a3; }
 
+/* The gallery select: two columns of gallery buttons, locked ones dimmed. */
 #level-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -198,6 +204,7 @@ canvas#game {
 
 .fineprint { font-size: 12px; color: #9a917c; margin: 4px 0 0; }
 
+/* The clear screen: big gold stars, then the score rows. */
 .stars { font-size: 34px; color: #ffd94d; letter-spacing: 6px; margin: 2px 0 10px; }
 
 .rows { max-width: 460px; margin: 0 auto 16px; }

@@ -1,9 +1,9 @@
-// player.js — the thief: movement, sneaking, noise and shadow.
+// player.js — the thief: how she moves, sneaks, sounds and hides.
 //
-// WASD or the arrow keys move; holding Shift sneaks — slower, silent,
-// and harder to spot. Walking feet are heard by nearby guards and seen
-// more easily; a burgundy rug tile is shadow, where only a guard almost
-// on top of you can make you out.
+// WASD or the arrows steer her; holding Shift makes her sneak — slower,
+// near-silent, and harder to spot. Walking feet carry: a nearby guard
+// hears them and turns his head. A burgundy rug is shadow, where only a
+// guard almost standing on her can make her out at all.
 
 import { TILE, slideMove } from './vision.js';
 
@@ -30,33 +30,35 @@ export class Player {
     return Math.floor(this.y / TILE);
   }
 
+  // The character of the tile under her feet.
   tileChar(grid) {
     return grid.tileAt(this.tileX(), this.tileY());
   }
 
-  // inShadow is true on a rug tile — the museum's dark carpets.
+  // True while she stands on a rug — the museum's dark carpets.
   inShadow(grid) {
     return this.tileChar(grid) === ',';
   }
 
-  // update reads one frame of input: { x, y } as a direction of travel
-  // (each -1..1) and sneak as a boolean. hooks.onStep fires per footstep.
+  // update moves her one frame from an input of { x, y } travel
+  // direction (each -1..1) and a sneak flag. hooks.onStep fires once
+  // per footstep, so the soundscape can answer her feet.
   update(dt, input, grid, hooks) {
-    const length = Math.hypot(input.x, input.y);
+    const reach = Math.hypot(input.x, input.y);
     this.sneaking = Boolean(input.sneak);
-    this.moving = length > 0;
+    this.moving = reach > 0;
     if (!this.moving) {
       this.stepTimer = 0.12;
       return;
     }
-    const speed = this.sneaking ? SNEAK_SPEED : WALK_SPEED;
-    const nx = (input.x / length) * speed * dt;
-    const ny = (input.y / length) * speed * dt;
-    const moved = slideMove(grid, this.x, this.y, this.radius, nx, ny);
-    const travelled = Math.hypot(moved.x - this.x, moved.y - this.y);
-    this.x = moved.x;
-    this.y = moved.y;
-    if (travelled > 0.01) this.facing = Math.atan2(ny, nx);
+    const pace = this.sneaking ? SNEAK_SPEED : WALK_SPEED;
+    const stepX = (input.x / reach) * pace * dt;
+    const stepY = (input.y / reach) * pace * dt;
+    const after = slideMove(grid, this.x, this.y, this.radius, stepX, stepY);
+    const covered = Math.hypot(after.x - this.x, after.y - this.y);
+    this.x = after.x;
+    this.y = after.y;
+    if (covered > 0.01) this.facing = Math.atan2(stepY, stepX);
     this.stepTimer -= dt;
     if (this.stepTimer <= 0) {
       this.stepTimer = this.sneaking ? 0.46 : 0.31;

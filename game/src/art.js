@@ -1,15 +1,17 @@
-// art.js — every painter for the museum: tiles, props, cases and figures.
+// art.js — every painter for the museum: tiles, props, cases, figures.
 //
-// Flat vector canvas art, all drawn from code (no image assets). Colours
-// are chosen so the stealth reads at a glance: warm ivory marble for lit
-// floor, deep burgundy rugs for shadow, crimson guards against both, a
-// teal thief, amber cones. Decorative detail (marble veins, rug diamonds)
-// is seeded by tile coordinates so every render of a level is identical.
+// Flat vector canvas art, drawn entirely from code — no image assets.
+// The colours are chosen so the stealth reads at a glance: warm ivory
+// marble where the light falls, deep burgundy rugs where it does not,
+// crimson guards against both, a teal thief, amber cones. Decorative
+// detail (marble veins, rug diamonds) is seeded by tile coordinates, so
+// every render of a level comes out identical.
 
 import { TILE } from './vision.js';
 
-// tileSeed is a small deterministic hash of a tile's coordinates, used to
-// vary decoration without any randomness between frames.
+// tileSeed is a small deterministic hash of a tile's coordinates. It
+// varies decoration from tile to tile without any randomness between
+// frames.
 export function tileSeed(tx, ty) {
   let h = (tx * 374761393 + ty * 668265263) ^ 0x5bf03635;
   h = (h ^ (h >> 13)) * 1274126177;
@@ -19,28 +21,28 @@ export function tileSeed(tx, ty) {
 export const INK = '#241f2e';
 export const GOLD = '#c9a227';
 
-// drawFloor paints one lit marble tile: two alternating ivory tones, a
-// grout line, and — on seeded tiles — one faint vein stroke.
+// One lit marble tile: two alternating ivory tones, a grout line, and —
+// on seeded tiles — a single faint vein stroke across the diagonal.
 export function drawFloor(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
-  ctx.fillStyle = (tx + ty) % 2 === 0 ? '#ddd3bf' : '#d3c8b0';
+  const even = (tx + ty) % 2 === 0;
+  ctx.fillStyle = even ? '#ddd3bf' : '#d3c8b0';
   ctx.fillRect(x, y, TILE, TILE);
   ctx.strokeStyle = 'rgba(120, 105, 80, 0.35)';
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
-  if (tileSeed(tx, ty) > 0.62) {
-    ctx.strokeStyle = 'rgba(150, 138, 112, 0.30)';
-    ctx.beginPath();
-    const bend = tileSeed(ty, tx) * 14 - 7;
-    ctx.moveTo(x + 4, y + TILE - 6);
-    ctx.quadraticCurveTo(x + TILE / 2, y + TILE / 2 + bend, x + TILE - 5, y + 5);
-    ctx.stroke();
-  }
+  if (tileSeed(tx, ty) <= 0.62) return;
+  const bend = tileSeed(ty, tx) * 14 - 7;
+  ctx.strokeStyle = 'rgba(150, 138, 112, 0.30)';
+  ctx.beginPath();
+  ctx.moveTo(x + 4, y + TILE - 6);
+  ctx.quadraticCurveTo(x + TILE / 2, y + TILE / 2 + bend, x + TILE - 5, y + 5);
+  ctx.stroke();
 }
 
-// drawRug paints one shadow tile: deep burgundy carpet with a darker
-// border and a small gold diamond — the museum's hiding places.
+// One shadow tile: deep burgundy carpet with a darker edge and a small
+// gold diamond at its heart — the museum's hiding places.
 export function drawRug(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
@@ -56,8 +58,8 @@ export function drawRug(ctx, tx, ty) {
   ctx.restore();
 }
 
-// drawWall paints one wall tile: dark plum block with a lit top face, so
-// the rooms read with a hint of height.
+// One wall tile: a dark plum block with a lit top face, so the rooms
+// read with a hint of height, a gold trim line and a shaded base.
 export function drawWall(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
@@ -71,8 +73,8 @@ export function drawWall(ctx, tx, ty) {
   ctx.fillRect(x, y + TILE - 5, TILE, 5);
 }
 
-// drawPedestal paints a display pedestal (cover): stone body, gold band,
-// and a small artefact resting on top, varied by seed.
+// A display pedestal (cover): stone body, gold band, and a small
+// artefact resting on top, its colour varied by the tile's seed.
 export function drawPedestal(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
@@ -85,59 +87,65 @@ export function drawPedestal(ctx, tx, ty) {
   ctx.fillStyle = GOLD;
   ctx.fillRect(x + 3, y + 12, TILE - 6, 2);
   const seed = tileSeed(tx, ty);
-  ctx.fillStyle = seed > 0.66 ? '#7fb3c8' : seed > 0.33 ? '#c87f9a' : '#9ac87f';
+  const orb = seed > 0.66 ? '#7fb3c8' : seed > 0.33 ? '#c87f9a' : '#9ac87f';
+  ctx.fillStyle = orb;
   ctx.beginPath();
   ctx.arc(x + TILE / 2, y + 1, 4.5, 0, Math.PI * 2);
   ctx.fill();
 }
 
-// drawStatue paints a statue (tall cover): plinth and a robed figure.
+// A statue (tall cover): plinth and a robed figure rising from it.
 export function drawStatue(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
+  const cx = x + TILE / 2;
   ctx.fillStyle = 'rgba(0,0,0,0.20)';
   ctx.fillRect(x + 2, y + TILE - 6, TILE - 3, 5);
   ctx.fillStyle = '#6f6a72';
   ctx.fillRect(x + 6, y + TILE - 12, TILE - 12, 10);
   ctx.fillStyle = '#8b8694';
   ctx.beginPath();
-  ctx.arc(x + TILE / 2, y + 9, 6, 0, Math.PI * 2);
+  ctx.arc(cx, y + 9, 6, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(x + TILE / 2 - 8, y + TILE - 12);
-  ctx.quadraticCurveTo(x + TILE / 2 - 6, y + 14, x + TILE / 2, y + 13);
-  ctx.quadraticCurveTo(x + TILE / 2 + 6, y + 14, x + TILE / 2 + 8, y + TILE - 12);
+  ctx.moveTo(cx - 8, y + TILE - 12);
+  ctx.quadraticCurveTo(cx - 6, y + 14, cx, y + 13);
+  ctx.quadraticCurveTo(cx + 6, y + 14, cx + 8, y + TILE - 12);
   ctx.closePath();
   ctx.fill();
 }
 
-// drawPlanter paints a planter (cover): terracotta box, green canopy.
+// A planter (cover): terracotta box under a green canopy of blobs.
 export function drawPlanter(ctx, tx, ty) {
   const x = tx * TILE;
   const y = ty * TILE;
   ctx.fillStyle = '#9a5a3c';
   ctx.fillRect(x + 4, y + TILE - 13, TILE - 8, 10);
+  const dark = [[13, 15, 10], [27, 13, 11], [20, 22, 12], [11, 24, 8], [29, 24, 8]];
+  const light = [[16, 14, 6], [25, 18, 7], [20, 10, 5]];
   ctx.fillStyle = '#2e6b3e';
-  for (const [dx, dy, r] of [[13, 15, 10], [27, 13, 11], [20, 22, 12], [11, 24, 8], [29, 24, 8]]) {
+  for (const blob of dark) {
     ctx.beginPath();
-    ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+    ctx.arc(x + blob[0], y + blob[1], blob[2], 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.fillStyle = '#3c8a50';
-  for (const [dx, dy, r] of [[16, 14, 6], [25, 18, 7], [20, 10, 5]]) {
+  for (const blob of light) {
     ctx.beginPath();
-    ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+    ctx.arc(x + blob[0], y + blob[1], blob[2], 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
-// drawGemCase paints a glass loot case at a tile centre: pale glass box
-// and the coloured gem inside. A taken case is drawn empty and dim.
+// A glass loot case at a tile centre: pale glass box and the coloured
+// gem inside. A taken case is drawn empty and dim.
 const GEM_HUES = ['#57c7e3', '#e3577a', '#7ae38a', '#e3c357', '#b57ae3', '#e38a57', '#57e3c7'];
 export function drawGemCase(ctx, cx, cy, taken, seedIndex) {
-  ctx.fillStyle = taken ? 'rgba(160, 170, 180, 0.25)' : 'rgba(170, 220, 240, 0.30)';
+  const glass = taken ? 'rgba(160, 170, 180, 0.25)' : 'rgba(170, 220, 240, 0.30)';
+  const edge = taken ? 'rgba(120, 125, 135, 0.5)' : 'rgba(220, 245, 255, 0.85)';
+  ctx.fillStyle = glass;
   ctx.fillRect(cx - 13, cy - 13, 26, 26);
-  ctx.strokeStyle = taken ? 'rgba(120, 125, 135, 0.5)' : 'rgba(220, 245, 255, 0.85)';
+  ctx.strokeStyle = edge;
   ctx.lineWidth = 1.5;
   ctx.strokeRect(cx - 13, cy - 13, 26, 26);
   if (taken) return;
@@ -151,24 +159,27 @@ export function drawGemCase(ctx, cx, cy, taken, seedIndex) {
   ctx.restore();
 }
 
-// drawTargetCase paints the level's prize: a larger gold-trimmed case
-// holding a glowing star artefact.
+// The level's prize: a larger gold-trimmed case holding a glowing star
+// artefact that breathes with the level clock.
 export function drawTargetCase(ctx, cx, cy, taken, pulse) {
-  ctx.fillStyle = taken ? 'rgba(160, 170, 180, 0.22)' : 'rgba(255, 226, 140, 0.28)';
+  const glass = taken ? 'rgba(160, 170, 180, 0.22)' : 'rgba(255, 226, 140, 0.28)';
+  const edge = taken ? 'rgba(120, 125, 135, 0.5)' : GOLD;
+  ctx.fillStyle = glass;
   ctx.fillRect(cx - 16, cy - 16, 32, 32);
-  ctx.strokeStyle = taken ? 'rgba(120, 125, 135, 0.5)' : GOLD;
+  ctx.strokeStyle = edge;
   ctx.lineWidth = 2;
   ctx.strokeRect(cx - 16, cy - 16, 32, 32);
   if (taken) return;
-  const r = 9 + Math.sin(pulse * 3) * 1.2;
+  const radius = 9 + Math.sin(pulse * 3) * 1.2;
   ctx.fillStyle = '#ffd94d';
   ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
-    const rad = i % 2 === 0 ? r : r * 0.45;
-    const px = cx + Math.cos(angle) * rad;
-    const py = cy + Math.sin(angle) * rad;
-    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  for (let point = 0; point < 10; point++) {
+    const angle = -Math.PI / 2 + (point * Math.PI) / 5;
+    const reach = point % 2 === 0 ? radius : radius * 0.45;
+    const px = cx + Math.cos(angle) * reach;
+    const py = cy + Math.sin(angle) * reach;
+    if (point === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
   }
   ctx.closePath();
   ctx.fill();
@@ -177,15 +188,16 @@ export function drawTargetCase(ctx, cx, cy, taken, pulse) {
   ctx.stroke();
 }
 
-// drawExit paints the exit doors on one tile: emerald double doors with a
-// light spill; a small padlock while the target is still in its case.
+// The exit doors on one tile: emerald double doors with a light spill
+// above them and an EXIT label; a small padlock while the target is
+// still in its case.
 export function drawExit(ctx, tx, ty, open) {
   const x = tx * TILE;
   const y = ty * TILE;
-  const grad = ctx.createLinearGradient(x, y + TILE, x, y);
-  grad.addColorStop(0, open ? 'rgba(64, 224, 150, 0.50)' : 'rgba(64, 160, 120, 0.22)');
-  grad.addColorStop(1, 'rgba(64, 224, 150, 0)');
-  ctx.fillStyle = grad;
+  const spill = ctx.createLinearGradient(x, y + TILE, x, y);
+  spill.addColorStop(0, open ? 'rgba(64, 224, 150, 0.50)' : 'rgba(64, 160, 120, 0.22)');
+  spill.addColorStop(1, 'rgba(64, 224, 150, 0)');
+  ctx.fillStyle = spill;
   ctx.fillRect(x - 2, y - 14, TILE + 4, TILE + 14);
   ctx.fillStyle = open ? '#1f9d63' : '#17694a';
   ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 3);
@@ -200,19 +212,18 @@ export function drawExit(ctx, tx, ty, open) {
   ctx.font = 'bold 8px Georgia, serif';
   ctx.textAlign = 'center';
   ctx.fillText('EXIT', x + TILE / 2, y + 12);
-  if (!open) {
-    ctx.fillStyle = '#2b2b33';
-    ctx.fillRect(x + TILE / 2 - 4, y + TILE / 2 + 1, 8, 7);
-    ctx.strokeStyle = '#cfd3da';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(x + TILE / 2, y + TILE / 2 + 1, 3.4, Math.PI, 0);
-    ctx.stroke();
-  }
+  if (open) return;
+  ctx.fillStyle = '#2b2b33';
+  ctx.fillRect(x + TILE / 2 - 4, y + TILE / 2 + 1, 8, 7);
+  ctx.strokeStyle = '#cfd3da';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x + TILE / 2, y + TILE / 2 + 1, 3.4, Math.PI, 0);
+  ctx.stroke();
 }
 
-// drawGuardFigure paints one guard: crimson coat, gold trim, peaked cap,
-// facing the given heading. Alertness tints the trim and adds a stance.
+// One guard: crimson coat, gold trim, peaked cap, facing the given
+// heading. Full suspicion tints the trim alarm red.
 export function drawGuardFigure(ctx, x, y, facing, suspicion) {
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.beginPath();
@@ -244,9 +255,9 @@ export function drawGuardFigure(ctx, x, y, facing, suspicion) {
   ctx.fill();
 }
 
-// drawThiefFigure paints the player: a teal hooded figure with a satchel;
-// while hidden it sits a little lower and dimmer, with a soft glow ring
-// drawn by the renderer when no guard can see it.
+// The player: a teal hooded figure with a satchel; while hidden she
+// sits a little dimmer, with a soft glow ring drawn by the renderer
+// when no guard can see her.
 export function drawThiefFigure(ctx, x, y, facing, sneaking, hidden) {
   ctx.globalAlpha = hidden ? 0.82 : 1;
   ctx.fillStyle = 'rgba(0,0,0,0.28)';
@@ -282,7 +293,7 @@ export function drawThiefFigure(ctx, x, y, facing, sneaking, hidden) {
   ctx.globalAlpha = 1;
 }
 
-// drawSpeechMark paints the "?" or "!" bubble over a guard's head.
+// The "?" or "!" bubble over a guard's head.
 export function drawSpeechMark(ctx, x, y, mark, colour) {
   ctx.fillStyle = 'rgba(255, 252, 240, 0.95)';
   ctx.beginPath();

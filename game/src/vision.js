@@ -1,133 +1,137 @@
-// vision.js — the museum grid, line of sight, cone geometry, movement.
+// vision.js — geometry of seeing and moving on the museum grid.
 //
-// Everything in Velvet Hour is measured in 40 px tiles. Walls and tall
-// cover (#, C, S, B) block both feet and eyes; the rest of the floor lets
-// both through. A guard's cone is drawn from the same ray march the
-// detection code runs, so the amber shape on screen is exactly what the
-// guard can see — no lies, no surprises.
+// The museum is measured in 40-pixel tiles. Anything tall — a wall, a
+// pedestal, a statue, a planter — stops both feet and eyes; the open
+// floor lets both through. Every cone the renderer paints is grown by
+// the same ray march the detection code walks, so the amber shape on
+// the screen and the guard's actual sight are one and the same thing.
 
 export const TILE = 40;
 
-const SIGHT_BLOCKERS = new Set(['#', 'C', 'S', 'B']);
-const MOVE_BLOCKERS = new Set(['#', 'C', 'S', 'B']);
+// Tiles that stop a glance, and tiles that stop a step. The two sets
+// happen to hold the same four characters in this museum.
+const BLOCKS_VIEW = new Set(['#', 'C', 'S', 'B']);
+const BLOCKS_STEP = new Set(['#', 'C', 'S', 'B']);
 
-// makeGrid wraps a level's rows of characters in the queries the game
-// needs: what tile is here, does it block sight or feet, where is its
-// centre in pixels.
+// Wrap a level's rows of characters in the questions the game asks of
+// them: which tile is at a coordinate, does it block sight or feet,
+// where is the middle of it in pixels.
 export function makeGrid(rows) {
-  const width = rows[0].length;
-  const height = rows.length;
-  return {
+  const grid = {
     rows,
-    width,
-    height,
-    tileAt(tx, ty) {
-      if (tx < 0 || ty < 0 || tx >= width || ty >= height) return '#';
-      return rows[ty][tx];
-    },
-    blocksSight(tx, ty) {
-      return SIGHT_BLOCKERS.has(this.tileAt(tx, ty));
-    },
-    blocksMove(tx, ty) {
-      return MOVE_BLOCKERS.has(this.tileAt(tx, ty));
-    },
-    // Pixel-space test: is this point inside a tile that blocks feet?
-    pointBlocked(px, py) {
-      return this.blocksMove(Math.floor(px / TILE), Math.floor(py / TILE));
-    },
-    tileCenter(tx, ty) {
-      return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
-    },
+    width: rows[0].length,
+    height: rows.length,
   };
+  grid.tileAt = function (tx, ty) {
+    const outside = tx < 0 || ty < 0 || tx >= this.width || ty >= this.height;
+    return outside ? '#' : this.rows[ty][tx];
+  };
+  grid.blocksSight = function (tx, ty) {
+    return BLOCKS_VIEW.has(this.tileAt(tx, ty));
+  };
+  grid.blocksMove = function (tx, ty) {
+    return BLOCKS_STEP.has(this.tileAt(tx, ty));
+  };
+  // Is this pixel inside a tile feet cannot enter?
+  grid.pointBlocked = function (px, py) {
+    return this.blocksMove(Math.floor(px / TILE), Math.floor(py / TILE));
+  };
+  grid.tileCenter = function (tx, ty) {
+    return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
+  };
+  return grid;
 }
 
-// hasLineOfSight walks from eye to target in 6 px steps. A step that
-// lands in a sight-blocking tile breaks the line — except the tiles the
-// two endpoints stand on, which never block: a guard does not lose you
-// because you are hugging the far side of a pedestal.
+// Bring a heading into (-PI, PI] so two headings can be compared.
+function wrapHeading(a) {
+  let wrapped = a % (Math.PI * 2);
+  if (wrapped > Math.PI) wrapped -= Math.PI * 2;
+  if (wrapped <= -Math.PI) wrapped += Math.PI * 2;
+  return wrapped;
+}
+
+// angleDistance is the smallest absolute gap between two headings.
+export function angleDistance(a, b) {
+  return Math.abs(wrapHeading(a - b));
+}
+
+// turnToward swings a heading toward a target heading by no more than
+// maxStep radians, always taking the short way around the circle.
+export function turnToward(current, target, maxStep) {
+  const gap = wrapHeading(target - current);
+  if (Math.abs(gap) <= maxStep) return target;
+  return current + Math.sign(gap) * maxStep;
+}
+
+// hasLineOfSight steps from the eye to the target in 6-pixel hops and
+// reports whether any hop lands inside a tile that blocks sight. The
+// tiles the two endpoints stand on are forgiven: a guard does not lose
+// you for pressing against the far side of a pedestal, only for having
+// the pedestal between you.
 export function hasLineOfSight(grid, x0, y0, x1, y1) {
   const dx = x1 - x0;
   const dy = y1 - y0;
   const dist = Math.hypot(dx, dy);
   if (dist < 1) return true;
-  const steps = Math.ceil(dist / 6);
-  const startTileX = Math.floor(x0 / TILE);
-  const startTileY = Math.floor(y0 / TILE);
-  const endTileX = Math.floor(x1 / TILE);
-  const endTileY = Math.floor(y1 / TILE);
-  for (let i = 1; i < steps; i++) {
-    const t = i / steps;
+  const hops = Math.ceil(dist / 6);
+  const fromX = Math.floor(x0 / TILE);
+  const fromY = Math.floor(y0 / TILE);
+  const toX = Math.floor(x1 / TILE);
+  const toY = Math.floor(y1 / TILE);
+  for (let hop = 1; hop < hops; hop++) {
+    const t = hop / hops;
     const tx = Math.floor((x0 + dx * t) / TILE);
     const ty = Math.floor((y0 + dy * t) / TILE);
-    if (tx === startTileX && ty === startTileY) continue;
-    if (tx === endTileX && ty === endTileY) continue;
+    const onEndpoint = (tx === fromX && ty === fromY) || (tx === toX && ty === toY);
+    if (onEndpoint) continue;
     if (grid.blocksSight(tx, ty)) return false;
   }
   return true;
 }
 
-// conePolygon fans 31 rays out from the eye across the field of view;
-// each ray marches 6 px at a time until it hits a sight blocker or runs
-// out of range. Eye plus ray ends is the polygon the renderer fills.
+// conePolygon grows one vision cone: 31 rays fanned across the field of
+// view, each marching 6 pixels at a time until a sight blocker stops it
+// or it runs out of range. The eye plus the ray ends is the polygon the
+// renderer fills.
 export function conePolygon(grid, eyeX, eyeY, facing, halfFov, range) {
-  const points = [{ x: eyeX, y: eyeY }];
-  const rays = 30;
-  for (let i = 0; i <= rays; i++) {
-    const angle = facing - halfFov + (2 * halfFov * i) / rays;
-    const stepX = Math.cos(angle);
-    const stepY = Math.sin(angle);
-    let travelled = 0;
+  const outline = [{ x: eyeX, y: eyeY }];
+  const rayCount = 30;
+  for (let ray = 0; ray <= rayCount; ray++) {
+    const heading = facing - halfFov + (2 * halfFov * ray) / rayCount;
+    const stepX = Math.cos(heading);
+    const stepY = Math.sin(heading);
     let px = eyeX;
     let py = eyeY;
+    let travelled = 0;
     while (travelled < range) {
       px += stepX * 6;
       py += stepY * 6;
       travelled += 6;
       if (grid.blocksSight(Math.floor(px / TILE), Math.floor(py / TILE))) break;
     }
-    points.push({ x: px, y: py });
+    outline.push({ x: px, y: py });
   }
-  return points;
+  return outline;
 }
 
-// slideMove walks a circle of the given radius by (dx, dy), one axis at
-// a time. An axis whose leading edge would enter a blocking tile is
-// cancelled, so bodies slide along walls and pedestals instead of
-// sticking to them.
+// slideMove shifts a circle of the given radius by (dx, dy), one axis
+// at a time. An axis whose leading edge would enter a blocking tile is
+// dropped, so bodies slide along walls and pedestals instead of jamming
+// against them.
 export function slideMove(grid, x, y, radius, dx, dy) {
-  const clear = (px, py) => !grid.pointBlocked(px, py);
+  const free = (px, py) => !grid.pointBlocked(px, py);
+  const probe = radius * 0.7;
   if (dx !== 0) {
-    const nx = x + dx;
-    const lead = nx + Math.sign(dx) * radius;
-    if (clear(lead, y - radius * 0.7) && clear(lead, y) && clear(lead, y + radius * 0.7)) {
-      x = nx;
+    const ahead = x + dx + Math.sign(dx) * radius;
+    if (free(ahead, y - probe) && free(ahead, y) && free(ahead, y + probe)) {
+      x += dx;
     }
   }
   if (dy !== 0) {
-    const ny = y + dy;
-    const lead = ny + Math.sign(dy) * radius;
-    if (clear(x - radius * 0.7, lead) && clear(x, lead) && clear(x + radius * 0.7, lead)) {
-      y = ny;
+    const ahead = y + dy + Math.sign(dy) * radius;
+    if (free(x - probe, ahead) && free(x, ahead) && free(x + probe, ahead)) {
+      y += dy;
     }
   }
   return { x, y };
-}
-
-// angleDistance is the smallest absolute difference between two
-// headings, wrapped to [0, PI].
-export function angleDistance(a, b) {
-  let d = (a - b) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return Math.abs(d);
-}
-
-// turnToward rotates a heading toward a target heading by at most
-// maxStep radians, always taking the short way round the circle.
-export function turnToward(current, target, maxStep) {
-  let d = (target - current) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  if (Math.abs(d) <= maxStep) return target;
-  return current + Math.sign(d) * maxStep;
 }

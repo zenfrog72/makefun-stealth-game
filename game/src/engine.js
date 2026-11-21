@@ -1,11 +1,11 @@
-// engine.js — Velvet Hour's conductor: game states, the loop, scoring,
-// the camera alarm, the HUD, and the staged scenes the screenshots use.
+// engine.js — Velvet Hour's conductor: states, the loop, scoring, the
+// camera alarm, the HUD, and the staged scenes the screenshots use.
 //
-// States: title (the museum idles behind the menu), play, paused, caught,
-// clear, complete — plus pose, a frozen staged frame the maker captures
-// for screenshots with ?shot=<name>, the same hook the kit's starter
-// uses. Everything the judge reads about structure starts here: this
-// file owns the flow, the modules under it own the game.
+// The game moves through title (the museum idles behind the menu),
+// play, paused, caught, clear and complete — plus pose, a frozen staged
+// frame the maker photographs for screenshots with ?shot=<name>, the
+// same hook the kit's starter uses. This file owns the flow; the
+// modules under it own the game.
 
 import { LEVELS } from './levels.js';
 import { makeGrid, TILE } from './vision.js';
@@ -18,6 +18,7 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const sound = new SoundEngine();
 
+// The HUD's live elements, gathered once.
 const hud = {
   level: document.getElementById('hud-level'),
   target: document.getElementById('hud-target'),
@@ -47,9 +48,10 @@ const keys = new Set();
 
 // ---------------------------------------------------------------- world
 
-// buildWorld assembles a level's living state from its data: grid,
-// figures, loot, and the score-keeping the HUD and clear screen read.
-function buildWorld(index) {
+// makeWorld assembles a gallery's living state from its data: the grid,
+// the figures, the loot, and the score-keeping the HUD and the clear
+// screen read.
+function makeWorld(index) {
   const level = LEVELS[index];
   const grid = makeGrid(level.grid);
   const w = {
@@ -85,8 +87,8 @@ function buildWorld(index) {
     for (let tx = 0; tx < grid.width; tx++) {
       const ch = grid.tileAt(tx, ty);
       if (ch === 'P') {
-        const c = grid.tileCenter(tx, ty);
-        w.player = new Player(c.x, c.y);
+        const middle = grid.tileCenter(tx, ty);
+        w.player = new Player(middle.x, middle.y);
       } else if (ch === 'g') {
         w.gems.set(tx + ',' + ty, { tx, ty, taken: false });
         w.gemTotal++;
@@ -98,24 +100,25 @@ function buildWorld(index) {
   return w;
 }
 
-function showPanel(name) {
+// setPanel shows one overlay panel, or none (the game bare).
+function setPanel(name) {
   overlay.classList.toggle('show', name !== null);
   for (const [key, panel] of Object.entries(panels)) {
     panel.classList.toggle('show', key === name);
   }
 }
 
-// startLevel begins a gallery with `banked` points already in hand:
-// 0 for a fresh run from the title, the running total when advancing,
-// and the level-start total when retrying (a retry refunds the level).
+// startLevel opens a gallery with `banked` points already in hand: 0
+// for a fresh run from the title, the running total when advancing,
+// and the level-start total when retrying — a retry refunds the level.
 function startLevel(index, banked) {
   levelIndex = index;
-  world = buildWorld(index);
+  world = makeWorld(index);
   world.score = banked;
   scoreAtLevelStart = banked;
   state = 'play';
-  showPanel(null);
-  refreshHud(true);
+  setPanel(null);
+  paintHud(true);
 }
 
 function restartLevel() {
@@ -124,7 +127,8 @@ function restartLevel() {
 
 // ---------------------------------------------------------------- update
 
-const guardHooks = {
+// What a guard's feet and voice do to the soundscape.
+const guardSound = {
   onStep(guard) {
     if (!world) return;
     const dist = Math.hypot(guard.x - world.player.x, guard.y - world.player.y);
@@ -138,13 +142,14 @@ const guardHooks = {
   },
 };
 
-const playerHooks = {
+const thiefSound = {
   onStep(sneaking) {
     sound.thiefStep(sneaking);
   },
 };
 
-function readInput() {
+// pollKeys turns the held keys into one frame of travel input.
+function pollKeys() {
   const input = { x: 0, y: 0, sneak: keys.has('shift') };
   if (keys.has('arrowleft') || keys.has('a')) input.x -= 1;
   if (keys.has('arrowright') || keys.has('d')) input.x += 1;
@@ -153,7 +158,7 @@ function readInput() {
   return input;
 }
 
-function addFloater(x, y, text) {
+function spawnFloater(x, y, text) {
   world.floaters.push({ x, y, text, age: 0, life: 1.15 });
 }
 
@@ -162,8 +167,8 @@ function takeGem(gem) {
   world.gemsTaken++;
   world.score += 100;
   world.staticDirty = true;
-  const c = world.grid.tileCenter(gem.tx, gem.ty);
-  addFloater(c.x, c.y - 14, '+100');
+  const middle = world.grid.tileCenter(gem.tx, gem.ty);
+  spawnFloater(middle.x, middle.y - 14, '+100');
   sound.pickup();
 }
 
@@ -171,10 +176,10 @@ function takeTarget(tx, ty) {
   world.targetTaken = true;
   world.score += 500;
   world.staticDirty = true;
-  const c = world.grid.tileCenter(tx, ty);
-  addFloater(c.x, c.y - 16, '+500 ' + world.targetName.toUpperCase());
+  const middle = world.grid.tileCenter(tx, ty);
+  spawnFloater(middle.x, middle.y - 16, '+500 ' + world.targetName.toUpperCase());
   sound.targetPickup();
-  setHint(`The ${world.targetName} is yours — reach the EXIT doors.`, 5);
+  flashHint(`The ${world.targetName} is yours — reach the EXIT doors.`, 5);
 }
 
 function triggerAlarm() {
@@ -190,14 +195,15 @@ function triggerAlarm() {
       guard.suspicion = Math.max(guard.suspicion, 0.6);
     }
   }
-  setHint('The camera raised the alarm — stay unseen until it fades.', 5);
+  flashHint('The camera raised the alarm — stay unseen until it fades.', 5);
 }
 
 function updateCameras(dt) {
   let worst = 0;
   for (const camera of world.cameras) {
     camera.update(dt, world.elapsed);
-    worst = Math.max(worst, camera.detection(world.grid, world.player));
+    const rate = camera.detection(world.grid, world.player);
+    if (rate > worst) worst = rate;
   }
   if (world.alarmActive) {
     world.alarmTimer -= dt;
@@ -220,29 +226,30 @@ function updateCameras(dt) {
 }
 
 function updatePlay(dt) {
-  const { grid, player } = world;
+  const grid = world.grid;
+  const player = world.player;
   world.elapsed += dt;
-  player.update(dt, readInput(), grid, playerHooks);
-  for (const guard of world.guards) guard.update(dt, player, guardHooks);
+  player.update(dt, pollKeys(), grid, thiefSound);
+  for (const guard of world.guards) guard.update(dt, player, guardSound);
   const cameraRate = updateCameras(dt);
 
-  // How exposed is the thief right now? (Drives the glow and the eye.)
-  let maxSuspicion = 0;
+  // How exposed is the thief right now? It drives the glow and the eye.
+  let worstSuspicion = 0;
   let seen = cameraRate > 0;
   for (const guard of world.guards) {
-    maxSuspicion = Math.max(maxSuspicion, guard.suspicion);
-    if (detectionRate(grid, guard.x, guard.y, guard.facing, GUARD_RANGE, GUARD_HALF_FOV, player) > 0) seen = true;
+    if (guard.suspicion > worstSuspicion) worstSuspicion = guard.suspicion;
+    const rate = detectionRate(grid, guard.x, guard.y, guard.facing, GUARD_RANGE, GUARD_HALF_FOV, player);
+    if (rate > 0) seen = true;
     if (guard.mode === 'chase' || guard.mode === 'search') seen = true;
   }
   world.playerHidden = !seen;
-  world.maxSuspicion = maxSuspicion;
-  if (maxSuspicion >= 0.35 && maxSuspicion < 1) sound.suspicionTick(maxSuspicion);
+  world.maxSuspicion = worstSuspicion;
+  if (worstSuspicion >= 0.35 && worstSuspicion < 1) sound.suspicionTick(worstSuspicion);
 
   // Caught: an alerted guard lays a hand on the thief.
   for (const guard of world.guards) {
-    if (guard.mode === 'chase' && Math.hypot(guard.x - player.x, guard.y - player.y) < 30) {
-      return caught();
-    }
+    const gap = Math.hypot(guard.x - player.x, guard.y - player.y);
+    if (guard.mode === 'chase' && gap < 30) return onCaught();
   }
 
   // Pickups and the exit, by the tile under the thief's feet.
@@ -255,29 +262,29 @@ function updatePlay(dt) {
   } else if (ch === 'T' && !world.targetTaken) {
     takeTarget(tx, ty);
   } else if (ch === 'E') {
-    if (world.targetTaken) return clearLevel();
+    if (world.targetTaken) return onCleared();
     if (world.elapsed - world.exitWarnedAt > 4) {
       world.exitWarnedAt = world.elapsed;
-      setHint(`Locked. The ${world.targetName} is still in its case.`, 3.5);
+      flashHint(`Locked. The ${world.targetName} is still in its case.`, 3.5);
     }
   }
 
   for (const floater of world.floaters) floater.age += dt;
   world.floaters = world.floaters.filter((f) => f.age < f.life);
   if (world.hintTimer > 0) world.hintTimer -= dt;
-  refreshHud(false);
+  paintHud(false);
 }
 
-function caught() {
+function onCaught() {
   state = 'caught';
   sound.caught();
   document.getElementById('caught-text').textContent =
     `Spotted in ${world.level.name}. The ${world.targetName} stays in its case tonight — ` +
     'watch the patrols, keep to the rugs, and try again.';
-  showPanel('caught');
+  setPanel('caught');
 }
 
-function clearLevel() {
+function onCleared() {
   state = 'clear';
   const timeBonus = Math.max(0, Math.round((world.level.par - world.elapsed) * 10));
   const ghostBonus = world.ghost ? 750 : 0;
@@ -291,39 +298,39 @@ function clearLevel() {
   const rows = [
     [`The ${world.targetName}`, '+500'],
     [`Gems — ${world.gemsTaken} of ${world.gemTotal}`, '+' + world.gemsTaken * 100],
-    [`Time bonus (${formatTime(world.elapsed)} against par ${formatTime(world.level.par)})`, '+' + timeBonus],
+    [`Time bonus (${clockText(world.elapsed)} against par ${clockText(world.level.par)})`, '+' + timeBonus],
     [world.ghost ? 'Ghost bonus — never truly seen' : 'Ghost bonus — you were seen', '+' + ghostBonus],
     ['Total score', String(world.score)],
   ];
   document.getElementById('clear-rows').innerHTML =
-    rows.map(([a, b]) => `<div class="row"><span>${a}</span><b>${b}</b></div>`).join('');
+    rows.map(([label, value]) => `<div class="row"><span>${label}</span><b>${value}</b></div>`).join('');
   document.getElementById('btn-next').textContent =
     levelIndex + 1 < LEVELS.length ? 'Next gallery →' : 'Finish the night →';
-  showPanel('clear');
-  refreshHud(true);
+  setPanel('clear');
+  paintHud(true);
 }
 
-function completeNight() {
+function onComplete() {
   state = 'complete';
   document.getElementById('complete-text').textContent =
     `Every gallery emptied, every guard none the wiser. Final score: ${world.score}. ` +
     'The Velvet Hour strikes again next weekend.';
-  showPanel('complete');
+  setPanel('complete');
 }
 
 // ------------------------------------------------------------------- HUD
 
-function formatTime(seconds) {
-  const s = Math.max(0, Math.floor(seconds));
-  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+function clockText(seconds) {
+  const total = Math.max(0, Math.floor(seconds));
+  return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
 }
 
-function setHint(text, seconds) {
+function flashHint(text, seconds) {
   world.hintOverride = text;
   world.hintTimer = seconds;
 }
 
-function refreshHud(force) {
+function paintHud(force) {
   if (!world) return;
   hud.level.textContent = `Gallery ${levelIndex + 1} — ${world.level.name}`;
   hud.target.textContent = world.targetTaken
@@ -332,7 +339,7 @@ function refreshHud(force) {
   hud.target.classList.toggle('secured', world.targetTaken);
   hud.gems.textContent = `◆ ${world.gemsTaken} / ${world.gemTotal}`;
   hud.score.textContent = 'SCORE ' + world.score;
-  hud.time.textContent = formatTime(world.elapsed);
+  hud.time.textContent = clockText(world.elapsed);
   const heat = Math.max(world.maxSuspicion ?? 0, world.cameras.length ? world.cameraMeter : 0);
   hud.eyeFill.style.width = Math.round(heat * 100) + '%';
   hud.eyeFill.style.background = heat >= 0.75 ? '#ff4a30' : heat >= 0.4 ? '#ff9a3c' : '#ffd94d';
@@ -340,17 +347,19 @@ function refreshHud(force) {
   if (world.hintTimer > 0) {
     hud.hint.textContent = world.hintOverride;
   } else if (state === 'play') {
-    const anyChase = world.guards.some((g) => g.mode === 'chase');
-    const anyCurious = world.guards.some((g) => g.suspicion >= 0.4);
-    hud.hint.textContent = world.alarmActive
-      ? 'The alarm is up — break every line of sight until it fades.'
-      : anyChase
-        ? 'RUN — and break his line of sight. He will search where he last saw you.'
-        : anyCurious
-          ? 'A guard is suspicious — slip behind cover and let him cool down.'
-          : world.targetTaken
-            ? 'Target secured — reach the green EXIT doors.'
-            : 'Cross the gallery unseen. Rugs are shadow; pedestals and statues block sight.';
+    const chasing = world.guards.some((g) => g.mode === 'chase');
+    const curious = world.guards.some((g) => g.suspicion >= 0.4);
+    if (world.alarmActive) {
+      hud.hint.textContent = 'The alarm is up — break every line of sight until it fades.';
+    } else if (chasing) {
+      hud.hint.textContent = 'RUN — and break his line of sight. He will search where he last saw you.';
+    } else if (curious) {
+      hud.hint.textContent = 'A guard is suspicious — slip behind cover and let him cool down.';
+    } else if (world.targetTaken) {
+      hud.hint.textContent = 'Target secured — reach the green EXIT doors.';
+    } else {
+      hud.hint.textContent = 'Cross the gallery unseen. Rugs are shadow; pedestals and statues block sight.';
+    }
   }
 }
 
@@ -364,14 +373,14 @@ window.addEventListener('keydown', (event) => {
   else keys.add(key);
   if ((key === 'p' || key === 'escape') && state === 'play') {
     state = 'paused';
-    showPanel('pause');
+    setPanel('pause');
   } else if ((key === 'p' || key === 'escape') && state === 'paused') {
     state = 'play';
-    showPanel(null);
+    setPanel(null);
   }
-  if (key === 'm') toggleMute();
+  if (key === 'm') flipMute();
   if (key === 'r' && state === 'caught') restartLevel();
-  if (key === 'enter' && state === 'clear') nextFromClear();
+  if (key === 'enter' && state === 'clear') advanceFromClear();
 });
 
 window.addEventListener('keyup', (event) => {
@@ -380,33 +389,33 @@ window.addEventListener('keyup', (event) => {
   else keys.delete(key);
 });
 
-function toggleMute() {
+function flipMute() {
   sound.setMuted(!sound.muted);
   document.getElementById('btn-mute').textContent = sound.muted ? 'SOUND OFF' : 'SOUND ON';
 }
 
-function nextFromClear() {
+function advanceFromClear() {
   if (levelIndex + 1 < LEVELS.length) {
     startLevel(levelIndex + 1, world.score);
   } else {
-    completeNight();
+    onComplete();
   }
 }
 
 // Buttons.
 document.getElementById('btn-pause').addEventListener('click', () => {
   sound.ensure();
-  if (state === 'play') { state = 'paused'; showPanel('pause'); }
-  else if (state === 'paused') { state = 'play'; showPanel(null); }
+  if (state === 'play') { state = 'paused'; setPanel('pause'); }
+  else if (state === 'paused') { state = 'play'; setPanel(null); }
 });
 document.getElementById('btn-restart').addEventListener('click', () => { sound.ensure(); if (world) restartLevel(); });
-document.getElementById('btn-mute').addEventListener('click', () => { sound.ensure(); toggleMute(); });
+document.getElementById('btn-mute').addEventListener('click', () => { sound.ensure(); flipMute(); });
 document.getElementById('btn-retry-caught').addEventListener('click', restartLevel);
 document.getElementById('btn-menu-caught').addEventListener('click', backToTitle);
-document.getElementById('btn-next').addEventListener('click', nextFromClear);
+document.getElementById('btn-next').addEventListener('click', advanceFromClear);
 document.getElementById('btn-retry-clear').addEventListener('click', restartLevel);
 document.getElementById('btn-menu-clear').addEventListener('click', backToTitle);
-document.getElementById('btn-resume').addEventListener('click', () => { state = 'play'; showPanel(null); });
+document.getElementById('btn-resume').addEventListener('click', () => { state = 'play'; setPanel(null); });
 document.getElementById('btn-restart-pause').addEventListener('click', restartLevel);
 document.getElementById('btn-menu-pause').addEventListener('click', backToTitle);
 document.getElementById('btn-again').addEventListener('click', () => startLevel(0, 0));
@@ -424,11 +433,11 @@ LEVELS.forEach((level, i) => {
 
 function backToTitle() {
   state = 'title';
-  world = buildWorld(0);
+  world = makeWorld(0);
   world.score = 0;
-  showPanel('title');
+  setPanel('title');
   refreshLevelButtons();
-  refreshHud(true);
+  paintHud(true);
 }
 
 function refreshLevelButtons() {
@@ -447,16 +456,16 @@ function refreshLevelButtons() {
 function stageShot(name) {
   const pose = (index) => {
     levelIndex = index;
-    world = buildWorld(index);
+    world = makeWorld(index);
     world.score = 0;
     state = 'pose';
     world.state = 'pose';
-    showPanel(null);
+    setPanel(null);
   };
   const place = (figure, tx, ty, facing) => {
-    const c = world.grid.tileCenter(tx, ty);
-    figure.x = c.x;
-    figure.y = c.y;
+    const middle = world.grid.tileCenter(tx, ty);
+    figure.x = middle.x;
+    figure.y = middle.y;
     figure.facing = facing;
   };
   if (name === 'cover') {
@@ -472,7 +481,7 @@ function stageShot(name) {
     guard.suspicion = 0.45;
     guard.mode = 'curious';
     world.maxSuspicion = 0.45;
-    setHint('A guard is suspicious — slip behind cover and let him cool down.', 999);
+    flashHint('A guard is suspicious — slip behind cover and let him cool down.', 999);
   } else if (name === 'vault') {
     pose(2);
     takeGemSilent(3, 2);
@@ -486,7 +495,7 @@ function stageShot(name) {
     place(guard, 14, 8, Math.PI);
     guard.suspicion = 0.12;
     world.maxSuspicion = 0.12;
-    setHint('One camera watches the vault — cross while its cone sweeps away.', 999);
+    flashHint('One camera watches the vault — cross while its cone sweeps away.', 999);
   } else if (name === 'alarm') {
     pose(1);
     takeGemSilent(3, 1);
@@ -501,7 +510,7 @@ function stageShot(name) {
     world.guards[2].suspicion = 0.5;
     world.maxSuspicion = 1;
     world.alarmActive = true;
-    setHint('RUN — and break his line of sight. He will search where he last saw you.', 999);
+    flashHint('RUN — and break his line of sight. He will search where he last saw you.', 999);
   } else if (name === 'clear') {
     pose(0);
     for (const gem of world.gems.values()) gem.taken = true;
@@ -519,11 +528,11 @@ function stageShot(name) {
       ['Time bonus (0:52 against par 1:15)', '+230'],
       ['Ghost bonus — never truly seen', '+750'],
       ['Total score', '1880'],
-    ].map(([a, b]) => `<div class="row"><span>${a}</span><b>${b}</b></div>`).join('');
+    ].map(([label, value]) => `<div class="row"><span>${label}</span><b>${value}</b></div>`).join('');
     document.getElementById('btn-next').textContent = 'Next gallery →';
-    showPanel('clear');
+    setPanel('clear');
   }
-  refreshHud(true);
+  paintHud(true);
 }
 
 function takeGemSilent(tx, ty) {
@@ -558,11 +567,11 @@ function frame(timestamp) {
 
 // ------------------------------------------------------------------ boot
 
-world = buildWorld(0);
+world = makeWorld(0);
 world.score = 0;
-showPanel('title');
+setPanel('title');
 refreshLevelButtons();
-refreshHud(true);
+paintHud(true);
 
 const shot = new URLSearchParams(window.location.search).get('shot');
 if (shot) stageShot(shot);

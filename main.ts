@@ -1,13 +1,13 @@
 // Velvet Hour — the hand-in program for the stealth-game bounty.
 //
-// The game itself is the static site in game/ (index.html plus its ES
-// modules, no build step, no network). This program copies game/ and
-// screenshots/ into the output directory and writes dossier.json with the
-// kit's vendored buildDossier, byte for byte as the gate rebuilds it.
-// Before copying, it refuses to hand in screenshots the gate would refuse:
-// more than four of them, one over 256 KiB, or one whose dimensions break
-// the 1280 long-side / 480 short-side rule — the PNG header carries the
-// dimensions, so no image library is needed to check them.
+// The game is the static site in game/ (index.html and its ES modules:
+// no build step, no network). This program copies game/ and
+// screenshots/ into the output directory and writes dossier.json with
+// the kit's vendored buildDossier, byte for byte as the gate rebuilds
+// it. Before it copies anything, it refuses screenshots the gate would
+// refuse: more than four of them, one over 256 KiB, or one whose
+// dimensions break the 1280 long-side / 480 short-side rule. A PNG's
+// own header carries its dimensions, so no image library is needed.
 //
 // Outside the grader, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
@@ -24,15 +24,18 @@ const SHOT_MAX_BYTES = 262144; // 256 KiB
 const SHOT_LONG_SIDE_MAX = 1280;
 const SHOT_SHORT_SIDE_MIN = 480;
 
+// Read a PNG's width and height from its first 24 bytes.
 function pngSize(path: string): { width: number; height: number } {
   const head = readFileSync(path).subarray(0, 24);
   const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  const isPng = signature.every((b, i) => head[i] === b);
+  const isPng = signature.every((byte, i) => head[i] === byte);
   if (!isPng) throw new Error(`${path}: not a PNG (this entry ships PNG screenshots)`);
   const view = new DataView(head.buffer, head.byteOffset, head.byteLength);
   return { width: view.getUint32(16), height: view.getUint32(20) };
 }
 
+// Check the screenshots directory against the gate's rules and return
+// the file names, sorted, that the hand-in will carry.
 function checkScreenshots(dir: string): string[] {
   const names = readdirSync(dir)
     .filter((n) => /\.(png|jpe?g)$/i.test(n) && !n.startsWith('.'))
@@ -67,9 +70,9 @@ if (existsSync(join(here, 'screenshots'))) {
   cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
 }
 
-// The caps below are the scorer's own (see the kit's RULES.txt, The gate):
-// the dossier text is capped at 160 KiB, and the counts refuse an entry the
-// gate would refuse.
+// The caps below are the scorer's own (see the kit's RULES.txt, The
+// gate): the dossier text is capped at 160 KiB, and the counts refuse an
+// entry the gate would refuse.
 writeFileSync(
   join(out, 'dossier.json'),
   buildDossier(out, {

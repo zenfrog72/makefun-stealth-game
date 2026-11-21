@@ -1,17 +1,18 @@
 // levels.js — the four galleries of the Velvet Hour museum, as data.
 //
-// Grid legend:
-//   #  museum wall            .  marble floor (lit)
-//   ,  burgundy rug (shadow — hide here)   C  display pedestal (cover)
-//   S  statue (tall cover)    B  planter (cover)
-//   g  gem case (loot)        T  the target artefact's case
-//   E  exit doors             P  the thief's entry point
-// Walls, pedestals, statues and planters block both movement and sight.
+// What each character of a grid row means:
+//   #  museum wall            .  marble floor, lit
+//   ,  burgundy rug — shadow, hide here   C  display pedestal, cover
+//   S  statue, tall cover     B  planter, cover
+//   g  gem case, loot         T  the target artefact's case
+//   E  exit doors             P  where the thief slips in
+// Walls, pedestals, statues and planters block both feet and eyes.
 //
-// Guards walk waypoint to waypoint in straight lines, so every patrol
-// below runs along a clear corridor. Cameras sit on a tile and sweep
-// their cone back and forth across the arc named by base and sweep
-// (degrees, 0 = east, positive clockwise).
+// A guard walks his waypoints in a straight line, so every patrol below
+// follows a clear corridor; he waits at each end, looking around, then
+// turns back. A camera sits on one tile and sweeps its cone back and
+// forth across the arc its base and sweep name (degrees, 0 is east,
+// positive clockwise).
 
 export const LEVELS = [
   {
@@ -20,27 +21,37 @@ export const LEVELS = [
     targetName: 'Moonstone Brooch',
     par: 75,
     grid: [
-      '##########################',
-      '#....C.....T.....C.......#',
-      '#....C...........C....g..#',
+      '##########################', // the north wall
+      '#....C.....T.....C.......#', // target case on the north wall
+      '#....C...........C....g..#', // first gem, east side
       '#........................#',
-      '#..,,....C.....C....,,...#',
-      '#..,,....C..g..C....,,...#',
+      '#..,,....C.....C....,,...#', // rug, pedestals, rug
+      '#..,,....C..g..C....,,...#', // gem between two pedestals
       '#........................#',
-      '#....##..........##......#',
-      '#....##....,,....##...E..#',
+      '#....##..........##......#', // the hall's inner blocks
+      '#....##....,,....##...E..#', // exit on the east wall
       '#..........,,............#',
-      '#..g....C......C.....g...#',
+      '#..g....C......C.....g...#', // gems on both flanks
       '#.......C..,,..C.........#',
       '#..,,...C..,,..C....,,...#',
       '#..,,....................#',
-      '#....C.....P.......C.....#',
+      '#....C.....P.......C.....#', // the thief slips in here
       '#....C.............C.....#',
-      '##########################',
+      '##########################', // the south wall
     ],
     guards: [
-      { path: [{ x: 3, y: 3, wait: 1.4 }, { x: 22, y: 3, wait: 1.4 }] },
-      { path: [{ x: 23, y: 5, wait: 1.0 }, { x: 23, y: 12, wait: 1.0 }] },
+      {
+        path: [
+          { x: 3, y: 3, wait: 1.4 },
+          { x: 22, y: 3, wait: 1.4 },
+        ],
+      },
+      {
+        path: [
+          { x: 23, y: 5, wait: 1.0 },
+          { x: 23, y: 12, wait: 1.0 },
+        ],
+      },
     ],
     cameras: [],
   },
@@ -51,27 +62,42 @@ export const LEVELS = [
     par: 100,
     grid: [
       '##########################',
-      '#..g.....S.......S.......#',
-      '#........S...T...S....g..#',
+      '#..g.....S.......S.......#', // gems between the statues
+      '#........S...T...S....g..#', // target case, centre north
       '#..,,....S.......S.......#',
       '#..,,....................#',
-      '#.....B.....##.....B.....#',
+      '#.....B.....##.....B.....#', // planters and the garden wall
       '#..g..B.....##.....B..g..#',
       '#........................#',
-      '#....,,....,,....,,......#',
-      '#....,,....,,....,,...E..#',
+      '#....,,....,,....,,......#', // three rugs in a row
+      '#....,,....,,....,,...E..#', // exit, east wall
       '#........................#',
       '#.....B.....##.....B.....#',
       '#..,,.B..g..##.....B..,,.#',
       '#..,,................,,..#',
-      '#........C....P..........#',
+      '#........C....P..........#', // the thief slips in here
       '#..g.....C.........g.....#',
       '##########################',
     ],
     guards: [
-      { path: [{ x: 4, y: 4, wait: 1.2 }, { x: 21, y: 4, wait: 1.2 }] },
-      { path: [{ x: 15, y: 7, wait: 0.8 }, { x: 15, y: 13, wait: 0.8 }] },
-      { path: [{ x: 21, y: 13, wait: 1.0 }, { x: 5, y: 13, wait: 1.0 }] },
+      {
+        path: [
+          { x: 4, y: 4, wait: 1.2 },
+          { x: 21, y: 4, wait: 1.2 },
+        ],
+      },
+      {
+        path: [
+          { x: 15, y: 7, wait: 0.8 },
+          { x: 15, y: 13, wait: 0.8 },
+        ],
+      },
+      {
+        path: [
+          { x: 21, y: 13, wait: 1.0 },
+          { x: 5, y: 13, wait: 1.0 },
+        ],
+      },
     ],
     cameras: [],
   },
@@ -82,30 +108,47 @@ export const LEVELS = [
     par: 120,
     grid: [
       '############################',
-      '#.....C......T.......C.....#',
-      '#..g..C..............C..g..#',
+      '#.....C......T.......C.....#', // target case, centre north
+      '#..g..C..............C..g..#', // gems on both flanks
       '#.....C..........##..C.....#',
       '#.................##.......#',
       '#..,,.....C......C.....,,..#',
       '#..,,.....C..##..C.....,,..#',
       '#................##........#',
-      '#....##....,,..........##..#',
+      '#....##....,,..........##..#', // the vault block, centre
       '#....##....,,....C.....##..#',
       '#..........,,....C.........#',
       '#..g....C........C....g....#',
       '#.......C....##..C.........#',
       '#..,,...C....##..C....,,...#',
       '#..,,..................,,..#',
-      '#.....C......P......C......#',
-      '#..g..C.............C...E..#',
+      '#.....C......P......C......#', // the thief slips in here
+      '#..g..C.............C...E..#', // exit, south-east corner
       '############################',
     ],
     guards: [
-      { path: [{ x: 4, y: 2, wait: 1.2 }, { x: 4, y: 7, wait: 1.2 }] },
-      { path: [{ x: 8, y: 8, wait: 0.8 }, { x: 22, y: 8, wait: 0.8 }] },
-      { path: [{ x: 8, y: 14, wait: 1.0 }, { x: 19, y: 14, wait: 1.0 }] },
+      {
+        path: [
+          { x: 4, y: 2, wait: 1.2 },
+          { x: 4, y: 7, wait: 1.2 },
+        ],
+      },
+      {
+        path: [
+          { x: 8, y: 8, wait: 0.8 },
+          { x: 22, y: 8, wait: 0.8 },
+        ],
+      },
+      {
+        path: [
+          { x: 8, y: 14, wait: 1.0 },
+          { x: 19, y: 14, wait: 1.0 },
+        ],
+      },
     ],
-    cameras: [{ x: 13, y: 2, base: 90, sweep: 55, period: 7 }],
+    cameras: [
+      { x: 13, y: 2, base: 90, sweep: 55, period: 7 },
+    ],
   },
   {
     name: 'The Star Sapphire',
@@ -117,9 +160,9 @@ export const LEVELS = [
       '#..g.....C..........C......#',
       '#........C....##....C...g..#',
       '#..,,....C....##....C......#',
-      '#..,,..........T...........#',
+      '#..,,..........T...........#', // target case, upper middle
       '#.....##....C.....C....##..#',
-      '#.....##....C..S..C....##..#',
+      '#.....##....C..S..C....##..#', // the statue at the centre
       '#................S.........#',
       '#..,,....C....S.....C..,,..#',
       '#..,,....C..........C..,,..#',
@@ -127,16 +170,36 @@ export const LEVELS = [
       '#....B......##......B......#',
       '#..g.B..,,..##..,,..B..g...#',
       '#....B......##......B......#',
-      '#..,,..........P.......,,..#',
+      '#..,,..........P.......,,..#', // the thief slips in here
       '#..,,....C..........C..,,..#',
-      '#........C....E.....C......#',
+      '#........C....E.....C......#', // exit, south wall
       '############################',
     ],
     guards: [
-      { path: [{ x: 3, y: 4, wait: 1.0 }, { x: 12, y: 4, wait: 1.0 }] },
-      { path: [{ x: 22, y: 5, wait: 0.8 }, { x: 22, y: 12, wait: 0.8 }] },
-      { path: [{ x: 20, y: 10, wait: 1.0 }, { x: 6, y: 10, wait: 1.0 }] },
-      { path: [{ x: 5, y: 14, wait: 0.8 }, { x: 22, y: 14, wait: 0.8 }] },
+      {
+        path: [
+          { x: 3, y: 4, wait: 1.0 },
+          { x: 12, y: 4, wait: 1.0 },
+        ],
+      },
+      {
+        path: [
+          { x: 22, y: 5, wait: 0.8 },
+          { x: 22, y: 12, wait: 0.8 },
+        ],
+      },
+      {
+        path: [
+          { x: 20, y: 10, wait: 1.0 },
+          { x: 6, y: 10, wait: 1.0 },
+        ],
+      },
+      {
+        path: [
+          { x: 5, y: 14, wait: 0.8 },
+          { x: 22, y: 14, wait: 0.8 },
+        ],
+      },
     ],
     cameras: [
       { x: 13, y: 1, base: 90, sweep: 60, period: 8 },
