@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Velvet Hour — a museum stealth caper</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header id="hud">
+  <div class="brand">VELVET&nbsp;HOUR</div>
+  <div id="hud-level" class="hud-item">Gallery 1 — The Marble Hall</div>
+  <div id="hud-target" class="hud-item target">TARGET — Moonstone Brooch</div>
+  <div id="hud-gems" class="hud-item">◆ 0 / 4</div>
+  <div id="hud-score" class="hud-item">SCORE 0</div>
+  <div id="hud-time" class="hud-item">0:00</div>
+  <div id="hud-eye" class="hud-item eye" title="How close the museum is to seeing you">
+    <span class="eye-label">👁</span>
+    <div class="eye-track"><div id="eye-fill"></div></div>
+  </div>
+  <nav class="hud-buttons">
+    <button id="btn-pause" type="button">PAUSE</button>
+    <button id="btn-restart" type="button">RESTART</button>
+    <button id="btn-mute" type="button">SOUND ON</button>
+  </nav>
+</header>
+
+<main>
+  <canvas id="game" width="1240" height="800"></canvas>
+</main>
+
+<footer id="hintbar">
+  <span id="hint">Cross the gallery unseen. Rugs are shadow; pedestals and statues block sight.</span>
+  <span class="controls">WASD / Arrows — move · SHIFT — sneak · P — pause · M — mute</span>
+</footer>
+
+<div id="overlay">
+  <section id="panel-title" class="panel">
+    <h1>VELVET HOUR</h1>
+    <p class="tagline">A museum stealth caper in four galleries.</p>
+    <p class="story">Midnight. The museum sleeps, its guards patrol, and four treasures
+      sit in glass cases with your name on them. Slip past the vision cones, keep to the
+      burgundy rugs where the light cannot follow, lift each gallery's prize — and walk
+      out of the green doors unseen.</p>
+    <ul class="howto">
+      <li><b>Move</b> with WASD or the arrow keys. <b>Hold Shift</b> to sneak: slower, silent, harder to see.</li>
+      <li><b>Amber cones</b> are guard vision — they redden as suspicion climbs. At <b>?</b> a guard stops and stares; at <b>!</b> he shouts and chases.</li>
+      <li><b>Break line of sight</b> and suspicion cools: he searches where he last saw you, then gives up. You always get a second chance.</li>
+      <li><b>Rugs are shadow</b> — only a guard almost on top of you can make you out there. Walking feet are <b>heard</b>: sneak near patrols.</li>
+      <li>Take the <b>target</b> from its gold case, grab gems for score, then reach the <b>EXIT</b>. Cameras sweep later galleries — their alarm summons every guard.</li>
+    </ul>
+    <div id="level-buttons"></div>
+    <p class="fineprint">Finish a gallery to unlock the next. A ghost — never truly seen — earns the night's best bonus.</p>
+  </section>
+
+  <section id="panel-caught" class="panel">
+    <h2>SPOTTED</h2>
+    <p id="caught-text">Spotted.</p>
+    <div class="panel-buttons">
+      <button id="btn-retry-caught" type="button">Try the gallery again (R)</button>
+      <button id="btn-menu-caught" type="button">Back to the title</button>
+    </div>
+  </section>
+
+  <section id="panel-clear" class="panel">
+    <h2 id="clear-title">Gallery cleared</h2>
+    <div id="clear-stars" class="stars">★★★</div>
+    <div id="clear-rows" class="rows"></div>
+    <div class="panel-buttons">
+      <button id="btn-next" type="button">Next gallery →</button>
+      <button id="btn-retry-clear" type="button">Replay for a better score</button>
+      <button id="btn-menu-clear" type="button">Back to the title</button>
+    </div>
+  </section>
+
+  <section id="panel-complete" class="panel">
+    <h2>THE NIGHT IS YOURS</h2>
+    <p id="complete-text">Every gallery emptied.</p>
+    <div class="panel-buttons">
+      <button id="btn-again" type="button">Steal it all again</button>
+      <button id="btn-menu-complete" type="button">Back to the title</button>
+    </div>
+  </section>
+
+  <section id="panel-pause" class="panel">
+    <h2>PAUSED</h2>
+    <p>The museum holds its breath.</p>
+    <div class="panel-buttons">
+      <button id="btn-resume" type="button">Resume (P)</button>
+      <button id="btn-restart-pause" type="button">Restart the gallery</button>
+      <button id="btn-menu-pause" type="button">Back to the title</button>
+    </div>
+  </section>
+</div>
+
+<script type="module" src="./src/engine.js"></script>
+</body>
+</html>
